@@ -37,49 +37,55 @@ log_success "Internet Gateway created: $IGW_ID"
 
 # Create Subnet 1 (AZ-a)
 log_info "[3/5] Creating Subnet 1 (${SUBNET_CIDR} in ${SUBNET_AZ})..."
+
+# Try to create subnet
 SUBNET_ID=$(aws ec2 create-subnet \
     --vpc-id "$VPC_ID" \
     --cidr-block "$SUBNET_CIDR" \
     --availability-zone "$SUBNET_AZ" \
     --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$SUBNET_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" \
-    --query 'Subnet.SubnetId' --output text 2>&1)
+    --query 'Subnet.SubnetId' \
+    --output text 2>/dev/null)
 
-# Check if subnet was created
-if [[ ! "$SUBNET_ID" =~ ^subnet- ]]; then
-    # Try to find existing subnet
+# If creation failed, try to find existing
+if [[ -z "$SUBNET_ID" ]] || [[ "$SUBNET_ID" == "None" ]]; then
     SUBNET_ID=$(get_resource_id subnet "$SUBNET_NAME")
 fi
 
+# Validate we have a subnet ID
 if [[ -z "$SUBNET_ID" ]] || [[ "$SUBNET_ID" == "None" ]] || [[ ! "$SUBNET_ID" =~ ^subnet- ]]; then
-    log_error "Failed to create subnet 1"
+    log_error "Failed to create or find Subnet 1"
     exit 1
 fi
 
-aws ec2 modify-subnet-attribute --subnet-id "$SUBNET_ID" --map-public-ip-on-launch
+aws ec2 modify-subnet-attribute --subnet-id "$SUBNET_ID" --map-public-ip-on-launch 2>/dev/null
 save_resource_id subnet "$SUBNET_ID" "$TEAM_NUMBER"
 log_success "Subnet 1 created: $SUBNET_ID"
 
 # Create Subnet 2 (AZ-b) - Required for ALB
 log_info "[4/5] Creating Subnet 2 (${SUBNET2_CIDR} in ${SUBNET2_AZ})..."
+
+# Try to create subnet
 SUBNET2_ID=$(aws ec2 create-subnet \
     --vpc-id "$VPC_ID" \
     --cidr-block "$SUBNET2_CIDR" \
     --availability-zone "$SUBNET2_AZ" \
     --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$SUBNET2_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" \
-    --query 'Subnet.SubnetId' --output text 2>&1)
+    --query 'Subnet.SubnetId' \
+    --output text 2>/dev/null)
 
-# Check if subnet was created
-if [[ ! "$SUBNET2_ID" =~ ^subnet- ]]; then
-    # Try to find existing subnet
+# If creation failed, try to find existing
+if [[ -z "$SUBNET2_ID" ]] || [[ "$SUBNET2_ID" == "None" ]]; then
     SUBNET2_ID=$(get_resource_id subnet "$SUBNET2_NAME")
 fi
 
+# Validate we have a subnet ID
 if [[ -z "$SUBNET2_ID" ]] || [[ "$SUBNET2_ID" == "None" ]] || [[ ! "$SUBNET2_ID" =~ ^subnet- ]]; then
-    log_error "Failed to create subnet 2"
+    log_error "Failed to create or find Subnet 2"
     exit 1
 fi
 
-aws ec2 modify-subnet-attribute --subnet-id "$SUBNET2_ID" --map-public-ip-on-launch
+aws ec2 modify-subnet-attribute --subnet-id "$SUBNET2_ID" --map-public-ip-on-launch 2>/dev/null
 save_resource_id subnet2 "$SUBNET2_ID" "$TEAM_NUMBER"
 log_success "Subnet 2 created: $SUBNET2_ID"
 
