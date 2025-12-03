@@ -42,7 +42,18 @@ SUBNET_ID=$(aws ec2 create-subnet \
     --cidr-block "$SUBNET_CIDR" \
     --availability-zone "$SUBNET_AZ" \
     --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$SUBNET_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" \
-    --query 'Subnet.SubnetId' --output text 2>/dev/null || get_resource_id subnet "$SUBNET_NAME")
+    --query 'Subnet.SubnetId' --output text 2>&1)
+
+# Check if subnet was created
+if [[ ! "$SUBNET_ID" =~ ^subnet- ]]; then
+    # Try to find existing subnet
+    SUBNET_ID=$(get_resource_id subnet "$SUBNET_NAME")
+fi
+
+if [[ -z "$SUBNET_ID" ]] || [[ "$SUBNET_ID" == "None" ]] || [[ ! "$SUBNET_ID" =~ ^subnet- ]]; then
+    log_error "Failed to create subnet 1"
+    exit 1
+fi
 
 aws ec2 modify-subnet-attribute --subnet-id "$SUBNET_ID" --map-public-ip-on-launch
 save_resource_id subnet "$SUBNET_ID" "$TEAM_NUMBER"
@@ -55,7 +66,18 @@ SUBNET2_ID=$(aws ec2 create-subnet \
     --cidr-block "$SUBNET2_CIDR" \
     --availability-zone "$SUBNET2_AZ" \
     --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$SUBNET2_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" \
-    --query 'Subnet.SubnetId' --output text 2>/dev/null || get_resource_id subnet "$SUBNET2_NAME")
+    --query 'Subnet.SubnetId' --output text 2>&1)
+
+# Check if subnet was created
+if [[ ! "$SUBNET2_ID" =~ ^subnet- ]]; then
+    # Try to find existing subnet
+    SUBNET2_ID=$(get_resource_id subnet "$SUBNET2_NAME")
+fi
+
+if [[ -z "$SUBNET2_ID" ]] || [[ "$SUBNET2_ID" == "None" ]] || [[ ! "$SUBNET2_ID" =~ ^subnet- ]]; then
+    log_error "Failed to create subnet 2"
+    exit 1
+fi
 
 aws ec2 modify-subnet-attribute --subnet-id "$SUBNET2_ID" --map-public-ip-on-launch
 save_resource_id subnet2 "$SUBNET2_ID" "$TEAM_NUMBER"
