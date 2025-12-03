@@ -14,13 +14,16 @@ show_usage() {
 ╚══════════════════════════════════════════════════════════╝
 
 Usage: $0 --team TEAM_NUMBER
+   OR: $0 config/teamN.cfg
 
 Arguments:
     --team, -t NUMBER    Your team number (1-5)
+    config/teamN.cfg     Path to team config file
     --help, -h           Show this help
 
-Example:
+Examples:
     $0 --team 1
+    $0 config/team1.cfg
 
 This script will:
   1. ✓ Create AWS infrastructure (VPC, subnets, security groups)
@@ -37,6 +40,15 @@ EOF
 
 # Parse team number
 TEAM_NUMBER=""
+
+# Check if first argument is a config file
+if [[ $# -gt 0 ]] && [[ "$1" == config/team*.cfg ]]; then
+    # Extract team number from config filename  
+    TEAM_NUMBER=$(echo "$1" | sed -n 's/.*team\([0-9]\)\.cfg/\1/p')
+    shift
+fi
+
+# Parse remaining arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         --team|-t) TEAM_NUMBER="$2"; shift 2 ;;
