@@ -1,178 +1,158 @@
-# AppDynamics Virtual Appliance - Multi-Team Lab
+# AppDynamics Virtual Appliance Lab
 
-> **For Students**: Start here! This lab will guide you through deploying AppDynamics in AWS.
+**Multi-team lab environment for hands-on AppDynamics training.**
 
----
+## 🚀 Quick Start (Students)
 
-## 🚀 Quick Start
+**→ [START HERE](START_HERE.md)** ← Begin here!
 
-### Prerequisites
-1. **AWS Account Access** - Your instructor will provide credentials
-2. **Cisco VPN** - Connect before starting (required for SSH access)
-3. **AWS CLI** - Already configured with your credentials
-4. **Your Team Number** - You'll be assigned Team 1-5
-
-### Lab Steps (30 minutes)
+### Deployment Steps
 
 ```bash
-# 1. Deploy Infrastructure (10 min)
-./lab-deploy.sh config/team1.cfg
+# 1. Clone the repository
+git clone <repository-url>
+cd deploy/aws
 
-# 2. Bootstrap VMs (5 min)
-./appd-bootstrap-vms.sh config/team1.cfg
+# 2. Run the deployment script
+./lab-deploy.sh --team <your-team-number>
 
-# 3. Create AppD Cluster (5 min)
-./appd-create-cluster.sh config/team1.cfg
+# 3. Wait ~30 minutes for completion
 
-# 4. Configure AppDynamics (3 min)
-./appd-configure.sh config/team1.cfg
-
-# 5. Install AppDynamics Services (10 min)
-./appd-install.sh config/team1.cfg
-
-# 6. (Optional) Install SecureApp (5 min)
-./appd-install-secureapp.sh config/team1.cfg
-
-# 7. Check Health
-./appd-check-health.sh config/team1.cfg
+# 4. Access your infrastructure
+# VMs: SSH to public IPs (provided after password change)
+# Web: https://controller-team<N>.splunkylabs.com/controller/
 ```
-
-### When You're Done
-
-```bash
-# Cleanup everything
-./lab-cleanup.sh config/team1.cfg
-```
-
----
 
 ## 📚 Documentation
 
-- **[Quick Start Guide](docs/QUICK_START.md)** - Step-by-step for students
-- **[Lab Guide](docs/LAB_GUIDE.md)** - Complete lab instructions
-- **[Quick Reference](docs/QUICK_REFERENCE.md)** - Commands and URLs
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues
+**For Students:**
+- **[START_HERE.md](START_HERE.md)** - ⭐ Quick start guide
+- **[LAB_GUIDE.md](LAB_GUIDE.md)** - Complete lab instructions  
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Command cheat sheet
+- **[TEAM2_BUILD.md](TEAM2_BUILD.md)** - Example build walkthrough
 
----
+**For Instructors:**
+- **[INSTRUCTOR_GUIDE.md](docs/INSTRUCTOR_GUIDE.md)** - Setup and management
+- **[DEPLOYMENT_SUMMARY.md](docs/DEPLOYMENT_SUMMARY.md)** - Architecture and decisions
+- **[SSH_KEY_SETUP.md](docs/SSH_KEY_SETUP.md)** - SSH authentication details
 
-## 🏗️ What Gets Built
+**All Documentation:** See [docs/](docs/) for complete index
 
-Each team builds their own isolated environment:
+## 🏗️ What Gets Deployed
 
-- **3 EC2 Instances** (AppDynamics nodes)
-- **VPC** with public subnet
-- **Application Load Balancer** (with SSL certificate)
-- **DNS Records** (Route 53)
-- **Security Groups** (restricted to Cisco VPN)
+Each team gets an isolated environment:
+- **VPC** with 2 subnets (multi-AZ)
+- **3 VMs** (m5a.4xlarge: 16 vCPU, 64GB RAM each)
+- **Application Load Balancer** with SSL certificate
+- **DNS** (team<N>.splunkylabs.com)
+- **Security Groups** (SSH restricted to Cisco VPN)
 
-**Your Controller URL**: `https://controller-team1.splunkylabs.com/controller/`
+## 🔑 Key Features
 
----
+✅ **Team Isolation** - Each team has their own VPC and resources  
+✅ **Automated Deployment** - One command deploys everything  
+✅ **SSH Key Support** - Passwordless authentication  
+✅ **Vendor-Compatible** - Matches AppDynamics official approach  
+✅ **Data Preservation** - Data disks survive instance termination  
+✅ **SSL Certificates** - Wildcard cert via AWS ACM  
 
-## 🔐 Security
+## 🎓 Lab Structure
 
-- **SSH Access**: Only from Cisco VPN (automatic)
-- **HTTPS Only**: Valid SSL certificates via AWS ACM
-- **No Credentials in Git**: `.gitignore` protects secrets
-- **Isolated Teams**: Each team has separate VPC/subnet
+- **5 Teams** - Supports up to 20 students (4 per team)
+- **~80 minutes** - Full deployment and installation time
+- **~$20/day** - Estimated cost per team for 8-hour lab
 
----
+## 🛠️ Technology Stack
 
-## 🆘 Need Help?
+- **AWS Services**: EC2, VPC, ALB, Route 53, ACM, EIP, ENI
+- **AppDynamics**: Virtual Appliance 25.4.0
+- **Kubernetes**: MicroK8s (3-node HA cluster)
+- **Automation**: Bash, expect, AWS CLI
+- **Authentication**: Password + SSH keys (hybrid approach)
 
-1. **Check Status**: `./appd-check-health.sh config/team1.cfg`
-2. **View Logs**: Check your terminal output
-3. **Troubleshooting**: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-4. **Ask Instructor**: They have the full setup guide
+## 📋 Prerequisites
 
----
+- AWS account with appropriate permissions
+- AWS CLI configured
+- Cisco VPN access (for SSH)
+- `expect` installed (`brew install expect` on macOS)
 
-## 📁 Project Structure
+## 📂 Project Structure
 
 ```
-.
-├── README.md                   # You are here!
-├── INSTRUCTOR_GUIDE.md         # For instructors only
+deploy/aws/
+├── START_HERE.md              # ⭐ Students start here
+├── README.md                  # This file
+├── LAB_GUIDE.md              # Complete lab guide  
+├── QUICK_REFERENCE.md        # Command reference
+├── TEAM2_BUILD.md            # Example build
 │
-├── 📁 Student Scripts (Run these)
-│   ├── lab-deploy.sh           # Step 1: Deploy infrastructure
-│   ├── appd-bootstrap-vms.sh   # Step 2: Bootstrap VMs
-│   ├── appd-create-cluster.sh  # Step 3: Create cluster
-│   ├── appd-configure.sh       # Step 4: Configure AppD
-│   ├── appd-install.sh         # Step 5: Install services
-│   ├── appd-install-secureapp.sh # Step 6: Optional SecureApp
-│   ├── appd-check-health.sh    # Check system health
-│   └── lab-cleanup.sh          # Cleanup when done
+├── lab-deploy.sh             # Main deployment script
+├── lab-cleanup.sh            # Teardown script
+├── appd-*.sh                 # AppDynamics automation scripts
 │
-├── 📁 config/                  # Team configurations
-│   ├── team1.cfg               # Team 1 settings
-│   ├── team2.cfg               # Team 2 settings
-│   └── ...                     # Teams 3-5
+├── config/                    # Team configurations
+│   ├── team1.cfg
+│   ├── team2.cfg
+│   └── ...
 │
-├── 📁 docs/                    # All documentation
-│   ├── QUICK_START.md
-│   ├── LAB_GUIDE.md
-│   ├── QUICK_REFERENCE.md
-│   ├── ARCHITECTURE.md
-│   ├── SECURITY.md
-│   ├── VPN_SETUP.md
-│   ├── SECUREAPP_GUIDE.md
-│   ├── TROUBLESHOOTING.md
-│   └── VENDOR_ISSUES.md
+├── scripts/                   # Infrastructure scripts
+│   ├── create-vms.sh
+│   ├── create-network.sh
+│   ├── create-security.sh
+│   ├── setup-ssh-keys.sh
+│   └── ...
 │
-├── 📁 scripts/                 # Helper scripts (internal)
-├── 📁 lib/                     # Shared functions
-└── 📁 archive/                 # Reference materials
+├── docs/                      # Detailed documentation
+│   ├── README.md             # Documentation index
+│   ├── INSTRUCTOR_GUIDE.md
+│   ├── DEPLOYMENT_SUMMARY.md
+│   └── SSH_KEY_SETUP.md
+│
+└── lib/                       # Shared functions
+    └── common.sh
 ```
 
----
+## 🔒 Security
 
-## ⚙️ Advanced
+- **SSH Access**: Restricted to Cisco VPN egress IPs only
+- **VM-to-VM**: All traffic allowed within security group (for K8s cluster)
+- **HTTPS**: Wildcard SSL certificate via AWS ACM
+- **Passwords**: Changed from default on first login
+- **SSH Keys**: Optional but recommended for better security
 
-### Team Configurations
+## 🐛 Known Issues & Fixes
 
-Each team has a config file (`config/team1.cfg`) with:
-- Team name & number
-- VPC CIDR block
-- DNS subdomain
-- AWS region
-- VM sizing
+This project fixes 31+ issues found in the vendor's original deployment scripts:
 
-**Don't edit these unless instructed!**
+- ✅ Data disk preservation (was being deleted!)
+- ✅ Correct disk device (/dev/sdb not /dev/sdf)
+- ✅ Proper EIP/ENI allocation sequence
+- ✅ VM-to-VM security group rules
+- ✅ SSH key automation
+- ✅ Cluster init host key handling
 
-### Manual Commands
+See [docs/DEPLOYMENT_SUMMARY.md](docs/DEPLOYMENT_SUMMARY.md) for complete list.
 
-If you need to SSH to your VMs:
+## 🤝 Contributing
 
-```bash
-# VM 1 (Primary)
-ssh appduser@$(cat state/team1-vm1-ip.txt)
+This is a training lab environment. For issues or improvements:
 
-# VM 2
-ssh appduser@$(cat state/team1-vm2-ip.txt)
+1. Test changes on a single team first
+2. Update documentation
+3. Commit with descriptive messages
+4. Ensure compatibility with vendor approach
 
-# VM 3
-ssh appduser@$(cat state/team1-vm3-ip.txt)
-```
+## 📧 Support
 
-Default password: Check with your instructor
+- **Lab Issues**: Check [LAB_GUIDE.md](LAB_GUIDE.md) troubleshooting section
+- **Instructor Questions**: See [docs/INSTRUCTOR_GUIDE.md](docs/INSTRUCTOR_GUIDE.md)
+- **Technical Details**: Review [docs/](docs/) directory
 
----
+## 📝 License
 
-## 📝 Credits
-
-- **AppDynamics**: Vendor documentation (with many fixes)
-- **This Lab**: Created for multi-team learning environment
-- **Fixes**: 31+ vendor documentation issues resolved
-
-See [docs/VENDOR_ISSUES.md](docs/VENDOR_ISSUES.md) for details on fixes.
+Internal training use only.
 
 ---
 
-## 📜 License
-
-Educational use only. AppDynamics software governed by Cisco licensing terms.
-
----
-
-**Ready to start?** Run `./lab-deploy.sh config/team1.cfg`
+**Ready to start?** → **[Click here to begin!](START_HERE.md)** ⭐

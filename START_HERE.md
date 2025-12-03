@@ -144,9 +144,9 @@ SSH is restricted to Cisco VPN IPs only. Connect to VPN first!
 
 ## 📚 Full Documentation
 
-- **Lab Guide**: `./docs/LAB_GUIDE.md` - Complete step-by-step instructions
-- **Quick Reference**: `./docs/QUICK_REFERENCE.md` - Common commands
-- **Instructor Guide**: `./INSTRUCTOR_GUIDE.md` - Setup and management
+- **Lab Guide**: `./LAB_GUIDE.md` - Complete step-by-step instructions
+- **Quick Reference**: `./QUICK_REFERENCE.md` - Common commands
+- **Instructor Guide**: `./docs/INSTRUCTOR_GUIDE.md` - Setup and management
 
 ---
 

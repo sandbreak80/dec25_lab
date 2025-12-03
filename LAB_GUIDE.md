@@ -273,14 +273,14 @@ Delete all your team's resources:
 ## 📚 Additional Resources
 
 ### Documentation
-- [Quick Reference](docs/QUICK_REFERENCE.md) - Commands and URLs
-- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues
-- [SecureApp Guide](docs/SECUREAPP_GUIDE.md) - SecureApp details
-- [Architecture](docs/ARCHITECTURE.md) - System design
+- [Quick Reference](QUICK_REFERENCE.md) - Commands and URLs
+- [TEAM2_BUILD.md](TEAM2_BUILD.md) - Example complete build
+- [docs/INSTRUCTOR_GUIDE.md](docs/INSTRUCTOR_GUIDE.md) - For instructors
+- [docs/DEPLOYMENT_SUMMARY.md](docs/DEPLOYMENT_SUMMARY.md) - Architecture
 
 ### Help & Support
-- **Lab Issues:** Check [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-- **Instructor Help:** Ask your instructor
+- **Lab Issues:** Check troubleshooting section above
+- **Instructor Help:** See [docs/INSTRUCTOR_GUIDE.md](docs/INSTRUCTOR_GUIDE.md)
 - **AppDynamics Docs:** https://docs.appdynamics.com/
 
 ---
