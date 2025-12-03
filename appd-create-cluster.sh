@@ -138,8 +138,29 @@ echo ""
 log_success "All nodes are ready!"
 echo ""
 
-# Step 2: Create cluster
-log_info "Step 2: Creating Kubernetes cluster..."
+# Step 2: Add VM2/VM3 host keys to VM1's known_hosts
+log_info "Step 2: Adding VM2/VM3 host keys to VM1's known_hosts..."
+echo ""
+
+if [[ "$SSH_METHOD" == "key" ]]; then
+    # Scan and add host keys for VM2 and VM3
+    ssh ${SSH_OPTS} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "ssh-keyscan -H ${VM2_PRIV} ${VM3_PRIV} >> ~/.ssh/known_hosts 2>/dev/null" 2>&1 | sed 's/^/  /'
+else
+    expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "ssh-keyscan -H ${VM2_PRIV} ${VM3_PRIV} >> ~/.ssh/known_hosts"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+fi
+
+log_success "Host keys added"
+echo ""
+
+# Step 3: Create cluster
+log_info "Step 3: Creating Kubernetes cluster..."
 echo ""
 log_info "Running: appdctl cluster init $VM2_PRIV $VM3_PRIV"
 echo ""
@@ -202,8 +223,8 @@ fi
 
 echo ""
 
-# Step 3: Verify cluster
-log_info "Step 3: Verifying cluster..."
+# Step 4: Verify cluster
+log_info "Step 4: Verifying cluster..."
 echo ""
 
 sleep 5
