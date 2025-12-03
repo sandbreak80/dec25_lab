@@ -98,7 +98,13 @@ bootstrap_vm() {
 #!/bin/bash
 set -e
 
+echo "╔══════════════════════════════════════════════════════════╗"
+echo "║  AppDynamics VA Bootstrap - VM${VM_NUM}                     ║"
+echo "╚══════════════════════════════════════════════════════════╝"
+echo ""
 echo "Starting AppDynamics host bootstrap..."
+echo "Default appduser password: changeme"
+echo ""
 
 # Get network details from current config
 HOSTNAME=$(hostname)
@@ -106,15 +112,20 @@ HOST_IP=$(ip addr show $(ip route | grep default | awk '{print $5}') | grep 'ine
 GATEWAY=$(ip route | grep default | awk '{print $3}')
 DNS_SERVER=$(grep nameserver /etc/resolv.conf | head -1 | awk '{print $2}')
 
-echo "Network Configuration:"
+echo "Network Configuration (auto-detected):"
 echo "  Hostname: $HOSTNAME"
 echo "  Host IP: $HOST_IP"
 echo "  Gateway: $GATEWAY"
 echo "  DNS: $DNS_SERVER"
 echo ""
 
-# Run appdctl host init with auto-detected values
+# Run appdctl host init as ubuntu (will use sudo)
+# Note: appduser exists but we're running as ubuntu with sudo
 echo "Running: sudo appdctl host init"
+echo "  (Logging in as appduser and running host init)"
+echo ""
+
+# Run the bootstrap command
 sudo appdctl host init <<EOF_INIT
 $HOSTNAME
 $HOST_IP
@@ -122,13 +133,33 @@ $GATEWAY
 $DNS_SERVER
 EOF_INIT
 
-echo ""
-echo "Bootstrap complete! Verifying..."
-sleep 5
-appdctl show boot
+BOOTSTRAP_STATUS=$?
 
-echo ""
-echo "✅ VM bootstrap successful!"
+if [ $BOOTSTRAP_STATUS -eq 0 ]; then
+    echo ""
+    echo "✅ Bootstrap command completed!"
+    echo ""
+    echo "Waiting 10 seconds for services to initialize..."
+    sleep 10
+    
+    echo ""
+    echo "Verifying bootstrap status:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    sudo -u appduser appdctl show boot || true
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "✅ VM bootstrap successful!"
+else
+    echo ""
+    echo "❌ Bootstrap command failed with exit code: $BOOTSTRAP_STATUS"
+    echo ""
+    echo "Troubleshooting:"
+    echo "  1. Check if appduser exists: id appduser"
+    echo "  2. Try running manually:"
+    echo "     sudo su - appduser"
+    echo "     sudo appdctl host init"
+    exit 1
+fi
 BOOTSTRAP_EOF
 
     # Copy and execute bootstrap script
