@@ -267,10 +267,16 @@ cat << EOF
 
 📝 Next Steps:
    1. Wait 2-3 minutes for DNS propagation
-   2. SSH to primary VM: ./scripts/ssh-vm1.sh --team ${TEAM_NUMBER}
-   3. Bootstrap VMs: Follow bootstrap guide
-   4. Create cluster: appdctl cluster init <vm2-ip> <vm3-ip>
-   5. Install AppDynamics: appdcli start all small
+   
+   2. Bootstrap VMs (REQUIRED!):
+      ./appd-bootstrap-vms.sh --team ${TEAM_NUMBER}
+   
+   3. Create cluster:
+      ./appd-create-cluster.sh --team ${TEAM_NUMBER}
+   
+   4. Configure & install:
+      ./appd-configure.sh --team ${TEAM_NUMBER}
+      ./appd-install.sh --team ${TEAM_NUMBER}
 
 📚 Documentation:
    Quick Start:     ./docs/QUICK_START.md

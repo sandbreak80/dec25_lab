@@ -42,30 +42,45 @@ Once your SSH key is created, deploy your lab environment:
 
 ---
 
-## 🔐 Step 3: Connect to Your VMs
+## 🔐 Step 3: Bootstrap VMs (REQUIRED!)
 
-### Easy Method (Recommended)
-Use the helper scripts:
+**CRITICAL**: VMs must be bootstrapped before AppDynamics can be installed!
 
 ```bash
-# Connect to VM1 (primary node)
-./scripts/ssh-vm1.sh --team 1
-
-# Connect to VM2
-./scripts/ssh-vm2.sh --team 1
-
-# Connect to VM3
-./scripts/ssh-vm3.sh --team 1
+./appd-bootstrap-vms.sh --team 1
 ```
 
-### Manual Method
+**What this does:**
+- Runs `appdctl host init` on each VM
+- Configures hostname, network, storage
+- Sets up firewall, SSH, certificates
+- Prepares VMs for AppDynamics cluster
+
+**Time:** ~5 minutes
+
+---
+
+## 🔗 Step 4: Create AppDynamics Cluster
+
 ```bash
-ssh -i ~/.ssh/appd-lab-team1-key.pem appduser@<VM-IP>
+./appd-create-cluster.sh --team 1
 ```
 
 ---
 
-## 🌐 Step 4: Access Web UI
+## ⚙️ Step 5: Configure & Install AppDynamics
+
+```bash
+# Configure cluster
+./appd-configure.sh --team 1
+
+# Install AppDynamics services
+./appd-install.sh --team 1
+```
+
+---
+
+## 🌐 Step 6: Access Web UI
 
 After deployment completes and AppDynamics is installed:
 
