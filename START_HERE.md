@@ -34,16 +34,30 @@ Deploy your lab environment:
 
 **Why?** The appduser account has default password "changeme" that must be changed.
 
-**How SSH works:**
-- VMs are configured with password-based SSH (vendor approach)
-- No SSH keys needed - use password authentication
-- Default user: `appduser`
-- Initial password: `changeme`
-- Team password: `AppDynamics123!` (or custom)
+---
+
+## 🔐 Step 3: Setup SSH Keys (HIGHLY RECOMMENDED!)
+
+**Avoid typing password 30-50 times during the lab!**
+
+```bash
+./scripts/setup-ssh-keys.sh --team 1
+```
+
+**What this does:**
+- Generates SSH key pair on your laptop
+- Copies public key to all 3 VMs
+- Enables passwordless SSH for all automation
+- Updates SSH config for easy access
+
+**Time:** 1 minute  
+**Benefit:** All subsequent SSH is passwordless! 🎉
+
+**Note:** This is optional but HIGHLY recommended for a better lab experience!
 
 ---
 
-## 🔐 Step 3: Bootstrap VMs (REQUIRED!)
+## 🔐 Step 4: Bootstrap VMs (REQUIRED!)
 
 **CRITICAL**: VMs must be bootstrapped before AppDynamics can be installed!
 
@@ -57,11 +71,15 @@ Deploy your lab environment:
 - Sets up firewall, SSH, certificates
 - Prepares VMs for AppDynamics cluster
 
+**Note:** 
+- If you setup SSH keys (Step 3), this runs passwordless!
+- Without keys, you'll need to enter password multiple times
+
 **Time:** ~5 minutes
 
 ---
 
-## 🔗 Step 4: Create AppDynamics Cluster
+## 🔗 Step 5: Create AppDynamics Cluster
 
 ```bash
 ./appd-create-cluster.sh --team 1
@@ -69,7 +87,7 @@ Deploy your lab environment:
 
 ---
 
-## ⚙️ Step 5: Configure & Install AppDynamics
+## ⚙️ Step 6: Configure & Install AppDynamics
 
 ```bash
 # Configure cluster
@@ -81,7 +99,7 @@ Deploy your lab environment:
 
 ---
 
-## 🌐 Step 6: Access Web UI
+## 🌐 Step 7: Access Web UI
 
 After deployment completes and AppDynamics is installed:
 
@@ -93,7 +111,7 @@ Password: welcome (change after first login)
 
 ---
 
-## 🧹 Step 7: Cleanup (End of Lab)
+## 🧹 Step 8: Cleanup (End of Lab)
 
 **IMPORTANT**: Delete all resources to avoid charges!
 
@@ -107,14 +125,16 @@ Password: welcome (change after first login)
 
 ## 🆘 Troubleshooting
 
-### "Permission denied" SSH Error
+### SSH Connection Issues
 ```bash
 # Make sure you changed the password first
 ./appd-change-password.sh --team 1
 
-# Then use the new password when prompted
+# Setup SSH keys for passwordless access (recommended!)
+./scripts/setup-ssh-keys.sh --team 1
+
+# Then SSH works easily
 ./scripts/ssh-vm1.sh --team 1
-# Password: AppDynamics123!
 ```
 
 ### Can't SSH from home/non-VPN
@@ -132,14 +152,23 @@ SSH is restricted to Cisco VPN IPs only. Connect to VPN first!
 
 ## 🔑 SSH Access Summary
 
-| Team | Username | Initial Password | Team Password |
-|------|----------|------------------|---------------|
-| All Teams | `appduser` | `changeme` | `AppDynamics123!` |
-
-**SSH Method:** Password-based authentication (no keys needed!)
+| Step | Method | Details |
+|------|--------|---------|
+| Initial | Password | `appduser` / `changeme` |
+| After Step 2 | Password | `appduser` / `AppDynamics123!` |
+| After Step 3 | Passwordless | SSH key authentication ✅ |
 
 **To connect:**
 ```bash
+# With SSH keys (after step 3) - EASY!
+./scripts/ssh-vm1.sh --team 1  # No password needed!
+
+# Or use SSH config shortcut
+ssh appd-team1-vm1  # No password needed!
+
+# Without SSH keys (manual)
 ssh appduser@<VM-IP>
-# Password: AppDynamics123! (after running appd-change-password.sh)
+# Password: AppDynamics123!
 ```
+
+**💡 Pro Tip:** Setup SSH keys (Step 3) to make the lab experience much smoother!

@@ -243,23 +243,28 @@ cat << EOF
       ./appd-change-password.sh --team ${TEAM_NUMBER}
       Default: changeme → AppDynamics123!
    
-   2. Bootstrap VMs (wait for image extraction ~15 min):
+   2. Setup SSH keys (HIGHLY RECOMMENDED - avoid typing password 30-50x!):
+      ./scripts/setup-ssh-keys.sh --team ${TEAM_NUMBER}
+      Time: 1 minute | Benefit: Passwordless SSH! 🎉
+   
+   3. Bootstrap VMs (wait for image extraction ~15 min):
       ./appd-bootstrap-vms.sh --team ${TEAM_NUMBER}
    
-   3. Test SSH access:
+   4. Test SSH access:
       ./scripts/ssh-vm1.sh --team ${TEAM_NUMBER}
-      Password: AppDynamics123!
+      (With keys: no password! Without keys: enter password)
    
-   4. Create cluster:
+   5. Create cluster:
       ./appd-create-cluster.sh --team ${TEAM_NUMBER}
    
-   5. Install AppDynamics:
+   6. Install AppDynamics:
       ./appd-install.sh --team ${TEAM_NUMBER}
       
 SSH Info:
    User: appduser
    Initial password: changeme
    Team password: AppDynamics123! (after step 1)
+   SSH keys: Optional but HIGHLY recommended! (step 2)
 
 📚 Documentation:
    Quick Start:     ./docs/QUICK_START.md

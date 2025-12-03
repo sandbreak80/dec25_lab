@@ -40,8 +40,6 @@ if [[ -z "$TEAM_NUMBER" ]] || ! [[ "$TEAM_NUMBER" =~ ^[1-5]$ ]]; then
     show_usage
 fi
 
-load_team_config "$TEAM_NUMBER"
-
 VM3_IP=$(cat "state/team${TEAM_NUMBER}/vm3-public-ip.txt" 2>/dev/null || echo "")
 
 if [[ -z "$VM3_IP" ]] || [[ "$VM3_IP" == "None" ]]; then
@@ -49,8 +47,30 @@ if [[ -z "$VM3_IP" ]] || [[ "$VM3_IP" == "None" ]]; then
     exit 1
 fi
 
-log_info "Connecting to VM3: $VM3_IP"
-log_info "User: $SSH_USER"
-log_warning "Password: Use team password (default: changeme, then AppDynamics123!)"
-echo ""
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${VM3_IP}"
+# Check if SSH key is configured
+KEY_PATH=$(cat "state/team${TEAM_NUMBER}/ssh-key-path.txt" 2>/dev/null || echo "")
+
+if [[ -n "$KEY_PATH" ]] && [[ -f "$KEY_PATH" ]]; then
+    # SSH with key (passwordless)
+    log_info "Connecting to VM3: $VM3_IP"
+    log_info "User: $SSH_USER"
+    log_success "Using SSH key: $KEY_PATH"
+    echo ""
+    
+    ssh -i "$KEY_PATH" \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        "${SSH_USER}@${VM3_IP}"
+else
+    # SSH with password
+    log_info "Connecting to VM3: $VM3_IP"
+    log_info "User: $SSH_USER"
+    log_warning "Password: AppDynamics123! (or your team password)"
+    echo ""
+    echo "💡 Tip: Run './scripts/setup-ssh-keys.sh --team ${TEAM_NUMBER}' for passwordless access!"
+    echo ""
+    
+    ssh -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        "${SSH_USER}@${VM3_IP}"
+fi

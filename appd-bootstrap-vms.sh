@@ -57,8 +57,16 @@ fi
 load_team_config "$TEAM_NUMBER"
 check_aws_cli
 
-# Note: We use sshpass for password-based SSH automation
-# Students will use their team password (set by appd-change-password.sh)
+# Check if SSH key is configured
+KEY_PATH=$(cat "state/team${TEAM_NUMBER}/ssh-key-path.txt" 2>/dev/null || echo "")
+if [[ -n "$KEY_PATH" ]] && [[ -f "$KEY_PATH" ]]; then
+    SSH_METHOD="key"
+    log_info "Using SSH key: $KEY_PATH"
+else
+    SSH_METHOD="password"
+    PASSWORD="AppDynamics123!"
+    log_info "Using password-based SSH (password: $PASSWORD)"
+fi
 
 log_info "Bootstrapping AppDynamics VMs for Team ${TEAM_NUMBER}..."
 echo ""
@@ -77,13 +85,13 @@ if [[ -z "$VM1_IP" ]] || [[ -z "$VM2_IP" ]] || [[ -z "$VM3_IP" ]]; then
     exit 1
 fi
 
-# Function to bootstrap a single VM
-bootstrap_vm() {
+# Function to bootstrap a single VM (with SSH key)
+bootstrap_vm_with_key() {
     local VM_NUM=$1
     local VM_IP=$2
     local VM_PRIVATE=$3
     
-    log_info "[$VM_NUM/3] Bootstrapping VM${VM_NUM}: $VM_IP"
+    log_info "[$VM_NUM/3] Bootstrapping VM${VM_NUM}: $VM_IP (using SSH key)"
     
     # Create bootstrap script
     cat > /tmp/bootstrap-vm${VM_NUM}.sh << 'BOOTSTRAP_EOF'
@@ -178,10 +186,16 @@ EOF_EXPECT
     echo ""
 }
 
-# Bootstrap all VMs
-bootstrap_vm 1 "$VM1_IP" "$VM1_PRIVATE"
-bootstrap_vm 2 "$VM2_IP" "$VM2_PRIVATE"
-bootstrap_vm 3 "$VM3_IP" "$VM3_PRIVATE"
+# Bootstrap all VMs based on SSH method
+if [[ "$SSH_METHOD" == "key" ]]; then
+    bootstrap_vm_with_key 1 "$VM1_IP" "$VM1_PRIVATE"
+    bootstrap_vm_with_key 2 "$VM2_IP" "$VM2_PRIVATE"
+    bootstrap_vm_with_key 3 "$VM3_IP" "$VM3_PRIVATE"
+else
+    bootstrap_vm_with_password 1 "$VM1_IP" "$VM1_PRIVATE"
+    bootstrap_vm_with_password 2 "$VM2_IP" "$VM2_PRIVATE"
+    bootstrap_vm_with_password 3 "$VM3_IP" "$VM3_PRIVATE"
+fi
 
 # Final verification
 log_info "Running final verification on all VMs..."
@@ -192,14 +206,22 @@ for i in 1 2 3; do
     VM_IP="${!VM_IP_VAR}"
     
     echo "VM${i} Status:"
-    expect << EOF_EXPECT
+    if [[ "$SSH_METHOD" == "key" ]]; then
+        ssh -i "${KEY_PATH}" \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            appduser@${VM_IP} "appdctl show boot" 2>&1 | sed 's/^/  /'
+    else
+        expect << EOF_EXPECT
 set timeout 10
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "appdctl show boot"
 expect {
-    "password:" { send "AppDynamics123!\r"; exp_continue }
+    "password:" { send "${PASSWORD}\r"; exp_continue }
     eof
 }
 EOF_EXPECT
+    fi
     echo ""
 done
 
