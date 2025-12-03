@@ -69,7 +69,41 @@ if ! [[ "$TEAM_NUMBER" =~ ^[1-5]$ ]]; then
 fi
 
 # Load configuration
+log_info "Loading configuration for Team ${TEAM_NUMBER}..."
 load_team_config "$TEAM_NUMBER"
+
+# Check if SSH key exists
+if [[ -z "$VM_SSH_KEY" ]]; then
+    VM_SSH_KEY="appd-lab-team${TEAM_NUMBER}-key"
+fi
+
+KEY_FILE="${HOME}/.ssh/${VM_SSH_KEY}.pem"
+if [[ ! -f "$KEY_FILE" ]]; then
+    echo ""
+    log_error "SSH key not found: $KEY_FILE"
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════╗"
+    echo "║  ❌ SSH KEY REQUIRED                                     ║"
+    echo "╚══════════════════════════════════════════════════════════╝"
+    echo ""
+    echo "You must create an SSH key BEFORE deploying infrastructure."
+    echo ""
+    echo "Run this command first:"
+    echo "  ./scripts/create-ssh-key.sh --team $TEAM_NUMBER"
+    echo ""
+    echo "This will:"
+    echo "  • Create AWS key pair: $VM_SSH_KEY"
+    echo "  • Save private key to: $KEY_FILE"
+    echo "  • Update your team config"
+    echo ""
+    exit 1
+fi
+
+echo ""
+log_success "Configuration loaded: $TEAM_NAME"
+log_info "VPC: $VPC_NAME ($VPC_CIDR)"
+log_info "Domain: $FULL_DOMAIN"
+log_success "SSH Key: $VM_SSH_KEY ✓"
 
 # Welcome banner
 clear
