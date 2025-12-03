@@ -96,3 +96,21 @@ DRAFT_*.md
 # Test outputs
 test-output/
 debug-*
+
+# Additional security - AWS and credentials
+**/credentials
+**/.aws/
+**/aws-credentials*
+**/*password*
+**/*secret*
+**/*key*.pem
+
+# Team-specific state (if created during deployment)
+state/
+*.state
+
+# Terraform (if used)
+.terraform/
+*.tfstate
+*.tfstate.backup
+
