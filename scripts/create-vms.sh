@@ -35,12 +35,13 @@ for i in 1 2 3; do
     INSTANCE_ID=$(get_resource_id instance "$VM_NAME")
     
     if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
-        # Create instance
+        # Create instance with SSH key
         INSTANCE_ID=$(aws ec2 run-instances \
             --image-id "$AMI_ID" \
             --instance-type "$VM_TYPE" \
             --subnet-id "$SUBNET_ID" \
             --security-group-ids "$VM_SG_ID" \
+            --key-name "${VM_SSH_KEY:-}" \
             --block-device-mappings \
                 "DeviceName=/dev/sda1,Ebs={VolumeSize=${VM_OS_DISK},VolumeType=gp3,DeleteOnTermination=true}" \
                 "DeviceName=/dev/sdf,Ebs={VolumeSize=${VM_DATA_DISK},VolumeType=gp3,DeleteOnTermination=true}" \
