@@ -137,21 +137,33 @@ change_password 3 "$VM3_IP"
 
 log_success "All VM passwords changed successfully!"
 echo ""
-echo "╔══════════════════════════════════════════════════════════╗"
-echo "║  Password Change Complete!                              ║"
-echo "╚══════════════════════════════════════════════════════════╝"
-echo ""
-echo "New appduser password: $NEW_PASSWORD"
-echo ""
-echo "Next Steps:"
-echo "  1. Bootstrap VMs:"
-echo "     ./appd-bootstrap-vms.sh --team $TEAM_NUMBER"
-echo ""
-echo "  2. Create cluster:"
-echo "     ./appd-create-cluster.sh --team $TEAM_NUMBER"
-echo ""
-echo "Important: Save this password! You'll need it for SSH access:"
-echo "  ssh ubuntu@<VM-IP>"
-echo "  sudo su - appduser"
-echo "  (password: $NEW_PASSWORD)"
-echo ""
+cat << EOF
+╔══════════════════════════════════════════════════════════╗
+║  Password Change Complete!                              ║
+╚══════════════════════════════════════════════════════════╝
+
+New appduser password: $NEW_PASSWORD
+
+Next Steps:
+  1. Setup SSH keys (HIGHLY RECOMMENDED - saves 30-50 password entries!):
+     ./scripts/setup-ssh-keys.sh --team $TEAM_NUMBER
+     Time: 1 minute | Result: Passwordless SSH! 🎉
+
+  2. Bootstrap VMs:
+     ./appd-bootstrap-vms.sh --team $TEAM_NUMBER
+     (Passwordless if you setup keys in Step 1!)
+
+  3. Create cluster:
+     ./appd-create-cluster.sh --team $TEAM_NUMBER
+
+SSH Access:
+  With SSH keys (after Step 1):
+    ./scripts/ssh-vm1.sh --team $TEAM_NUMBER  # No password! ✅
+
+  Without SSH keys (manual):
+    ssh appduser@<VM-IP>
+    Password: $NEW_PASSWORD
+
+💡 Pro Tip: Setup SSH keys (Step 1) for much better experience!
+
+EOF
