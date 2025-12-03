@@ -1,5 +1,6 @@
 #!/bin/bash
-# Create EC2 Instances (3 VMs)
+# Create EC2 Instances (3 VMs) - Vendor-Compatible Approach
+# Creates ENI first, then EIP, then instance (for better reliability)
 # Internal script - called by lab-deploy.sh
 
 set -e
@@ -12,6 +13,13 @@ load_team_config "$TEAM_NUMBER"
 check_aws_cli
 
 log_info "Deploying 3 EC2 instances for Team ${TEAM_NUMBER}..."
+echo ""
+log_warning "Using vendor-compatible approach:"
+echo "  1. Create ENI (Elastic Network Interface)"
+echo "  2. Allocate EIP (Elastic IP)"
+echo "  3. Associate EIP to ENI"
+echo "  4. Launch instance with ENI"
+echo ""
 
 # Get resources
 VPC_ID=$(load_resource_id vpc "$TEAM_NUMBER")
@@ -25,17 +33,24 @@ if [ -z "$AMI_ID" ] || [ "$AMI_ID" == "None" ]; then
     exit 1
 fi
 
-# Create 3 VMs
+log_info "Using AMI: $AMI_ID"
+log_info "Subnet: $SUBNET_ID"
+log_info "Security Group: $VM_SG_ID"
+echo ""
+
+# Create 3 VMs using vendor approach
 for i in 1 2 3; do
     VM_NAME="team${TEAM_NUMBER}-vm-${i}"
     
     log_info "[$i/3] Creating $VM_NAME..."
+    echo ""
     
     # Check if already exists
     INSTANCE_ID=$(get_resource_id instance "$VM_NAME")
     
     if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
-        # Create cloud-init user-data to enable password SSH (vendor approach)
+        
+        # Step 1: Create cloud-init user-data (vendor approach)
         cat > /tmp/user-data-vm${i}.txt <<'USER_DATA_EOF'
 #cloud-config
 ssh_pwauth: True
@@ -46,38 +61,112 @@ appdos:
       dhcp6: false
 USER_DATA_EOF
         
-        # Create instance with user-data (enables password SSH for appduser)
+        log_info "  [1/5] Creating Elastic Network Interface..."
+        ENI_ID=$(aws ec2 create-network-interface \
+            --subnet-id "$SUBNET_ID" \
+            --description "Team ${TEAM_NUMBER} VM${i} Network Interface" \
+            --groups "$VM_SG_ID" \
+            --tag-specifications "ResourceType=network-interface,Tags=[{Key=Name,Value=${VM_NAME}-eni},{Key=Team,Value=team${TEAM_NUMBER}}]" \
+            --query 'NetworkInterface.NetworkInterfaceId' \
+            --output text)
+        
+        if [ -z "$ENI_ID" ] || [ "$ENI_ID" == "None" ]; then
+            log_error "Failed to create ENI"
+            exit 1
+        fi
+        log_success "  ENI created: $ENI_ID"
+        
+        # Step 2: Allocate Elastic IP
+        log_info "  [2/5] Allocating Elastic IP..."
+        ALLOCATION_ID=$(aws ec2 allocate-address \
+            --domain vpc \
+            --tag-specifications "ResourceType=elastic-ip,Tags=[{Key=Name,Value=${VM_NAME}-eip},{Key=Team,Value=team${TEAM_NUMBER}}]" \
+            --query 'AllocationId' \
+            --output text)
+        
+        if [ -z "$ALLOCATION_ID" ] || [ "$ALLOCATION_ID" == "None" ]; then
+            log_error "Failed to allocate EIP"
+            # Clean up ENI
+            aws ec2 delete-network-interface --network-interface-id "$ENI_ID" 2>/dev/null || true
+            exit 1
+        fi
+        log_success "  EIP allocated: $ALLOCATION_ID"
+        
+        # Step 3: Associate EIP to ENI
+        log_info "  [3/5] Associating EIP to ENI..."
+        ASSOCIATION_ID=$(aws ec2 associate-address \
+            --allocation-id "$ALLOCATION_ID" \
+            --network-interface-id "$ENI_ID" \
+            --query 'AssociationId' \
+            --output text)
+        
+        if [ -z "$ASSOCIATION_ID" ] || [ "$ASSOCIATION_ID" == "None" ]; then
+            log_error "Failed to associate EIP"
+            # Clean up
+            aws ec2 release-address --allocation-id "$ALLOCATION_ID" 2>/dev/null || true
+            aws ec2 delete-network-interface --network-interface-id "$ENI_ID" 2>/dev/null || true
+            exit 1
+        fi
+        log_success "  EIP associated: $ASSOCIATION_ID"
+        
+        # Step 4: Launch instance with ENI (vendor approach)
+        log_info "  [4/5] Launching EC2 instance..."
+        
+        # CRITICAL: Use vendor disk configuration
+        # - /dev/sda1: OS disk (delete on termination)
+        # - /dev/sdb: Data disk (PRESERVE on termination!)
         INSTANCE_ID=$(aws ec2 run-instances \
             --image-id "$AMI_ID" \
             --instance-type "$VM_TYPE" \
-            --subnet-id "$SUBNET_ID" \
-            --security-group-ids "$VM_SG_ID" \
-            --user-data file:///tmp/user-data-vm${i}.txt \
+            --network-interfaces "[{\"NetworkInterfaceId\":\"${ENI_ID}\",\"DeviceIndex\":0}]" \
             --block-device-mappings \
                 "DeviceName=/dev/sda1,Ebs={VolumeSize=${VM_OS_DISK},VolumeType=gp3,DeleteOnTermination=true}" \
-                "DeviceName=/dev/sdf,Ebs={VolumeSize=${VM_DATA_DISK},VolumeType=gp3,DeleteOnTermination=true}" \
+                "DeviceName=/dev/sdb,Ebs={VolumeSize=${VM_DATA_DISK},VolumeType=gp3,DeleteOnTermination=false}" \
+            --user-data file:///tmp/user-data-vm${i}.txt \
             --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$VM_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" \
-            --query 'Instances[0].InstanceId' --output text)
+            --no-cli-pager \
+            --query 'Instances[0].InstanceId' \
+            --output text)
         
         # Clean up user-data file
         rm -f /tmp/user-data-vm${i}.txt
         
-        log_success "Instance created: $INSTANCE_ID"
+        if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
+            log_error "Failed to launch instance"
+            # Clean up
+            aws ec2 disassociate-address --association-id "$ASSOCIATION_ID" 2>/dev/null || true
+            aws ec2 release-address --allocation-id "$ALLOCATION_ID" 2>/dev/null || true
+            aws ec2 delete-network-interface --network-interface-id "$ENI_ID" 2>/dev/null || true
+            exit 1
+        fi
+        
+        log_success "  Instance launched: $INSTANCE_ID"
+        
     else
-        log_info "Instance already exists: $INSTANCE_ID"
+        log_info "  Instance already exists: $INSTANCE_ID"
     fi
     
     save_resource_id "vm${i}" "$INSTANCE_ID" "$TEAM_NUMBER"
+    save_resource_id "vm${i}-eni" "$ENI_ID" "$TEAM_NUMBER" 2>/dev/null || true
+    save_resource_id "vm${i}-eip" "$ALLOCATION_ID" "$TEAM_NUMBER" 2>/dev/null || true
     
-    # Wait for instance to be running
-    log_info "Waiting for instance to start..."
+    # Step 5: Wait for instance and get IPs
+    log_info "  [5/5] Waiting for instance to start..."
     aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
     
-    # Get public IP
-    PUBLIC_IP=$(aws ec2 describe-instances \
-        --instance-ids "$INSTANCE_ID" \
-        --query 'Reservations[0].Instances[0].PublicIpAddress' \
-        --output text)
+    # Get public IP (from EIP)
+    PUBLIC_IP=$(aws ec2 describe-addresses \
+        --allocation-ids "$ALLOCATION_ID" \
+        --query 'Addresses[0].PublicIp' \
+        --output text 2>/dev/null || echo "")
+    
+    if [ -z "$PUBLIC_IP" ]; then
+        # Fallback: get from instance
+        PUBLIC_IP=$(aws ec2 describe-instances \
+            --instance-ids "$INSTANCE_ID" \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+    fi
     
     echo "$PUBLIC_IP" > "state/team${TEAM_NUMBER}/vm${i}-public-ip.txt"
     
@@ -89,10 +178,35 @@ USER_DATA_EOF
     
     echo "$PRIVATE_IP" > "state/team${TEAM_NUMBER}/vm${i}-private-ip.txt"
     
-    log_success "$VM_NAME ready: $PUBLIC_IP (public) / $PRIVATE_IP (private)"
+    log_success "  $VM_NAME ready!"
+    echo "    Public IP:  $PUBLIC_IP (EIP - persists if instance stopped)"
+    echo "    Private IP: $PRIVATE_IP"
+    echo "    Data Disk:  /dev/sdb (500GB, preserved on termination)"
+    echo ""
 done
 
 log_success "All 3 VMs deployed!"
+echo ""
+
+cat << EOF
+╔══════════════════════════════════════════════════════════╗
+║  VM Deployment Summary                                  ║
+╚══════════════════════════════════════════════════════════╝
+
+Instance Type: $VM_TYPE (16 vCPU, 64GB RAM)
+OS Disk: ${VM_OS_DISK}GB (gp3, delete on termination)
+Data Disk: ${VM_DATA_DISK}GB (gp3, ✅ PRESERVED on termination)
+
+VM1: $(cat state/team${TEAM_NUMBER}/vm1-public-ip.txt) (public) / $(cat state/team${TEAM_NUMBER}/vm1-private-ip.txt) (private)
+VM2: $(cat state/team${TEAM_NUMBER}/vm2-public-ip.txt) (public) / $(cat state/team${TEAM_NUMBER}/vm2-private-ip.txt) (private)
+VM3: $(cat state/team${TEAM_NUMBER}/vm3-public-ip.txt) (public) / $(cat state/team${TEAM_NUMBER}/vm3-private-ip.txt) (private)
+
+✅ ENI created for each VM (better network control)
+✅ EIP allocated and associated (persistent public IPs)
+✅ Data disk preserved (survives instance termination)
+✅ Password SSH enabled (appduser / changeme)
+
+EOF
 
 # Save summary
 cat > "state/team${TEAM_NUMBER}/vm-summary.txt" << EOF
