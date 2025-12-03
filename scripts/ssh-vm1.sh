@@ -29,7 +29,7 @@ EOF
 }
 
 TEAM_NUMBER=""
-SSH_USER="appduser"
+SSH_USER="ubuntu"  # AppDynamics VA AMI uses ubuntu as default SSH user
 
 while [[ $# -gt 0 ]]; do
     case $1 in
