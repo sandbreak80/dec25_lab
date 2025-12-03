@@ -24,6 +24,8 @@ CERT_ARN="arn:aws:acm:us-west-2:314839308236:certificate/ce4f1e3b-0830-48f2-b187
 
 # Step 1: Create Target Group
 log_info "[1/5] Creating Target Group..."
+
+# Try to create target group
 TG_ARN=$(aws elbv2 create-target-group \
     --name "$TARGET_GROUP_NAME" \
     --protocol HTTPS \
@@ -36,13 +38,26 @@ TG_ARN=$(aws elbv2 create-target-group \
     --healthy-threshold-count 2 \
     --unhealthy-threshold-count 3 \
     --target-type instance \
-    --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null || get_resource_id tg "$TARGET_GROUP_NAME")
+    --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null)
 
-# Set matcher
+# If creation failed, find existing target group
+if [[ -z "$TG_ARN" ]] || [[ "$TG_ARN" == "None" ]]; then
+    TG_ARN=$(aws elbv2 describe-target-groups \
+        --names "$TARGET_GROUP_NAME" \
+        --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null)
+fi
+
+# Validate we have a TG ARN
+if [[ -z "$TG_ARN" ]] || [[ "$TG_ARN" == "None" ]]; then
+    log_error "Failed to create or find Target Group"
+    exit 1
+fi
+
+# Set matcher (idempotent - safe to run multiple times)
 aws elbv2 modify-target-group \
     --target-group-arn "$TG_ARN" \
     --matcher HttpCode=200,301,302,405 \
-    >/dev/null
+    >/dev/null 2>&1 || true
 
 save_resource_id tg "$TG_ARN" "$TEAM_NUMBER"
 log_success "Target Group: $TG_ARN"
