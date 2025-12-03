@@ -35,18 +35,32 @@ for i in 1 2 3; do
     INSTANCE_ID=$(get_resource_id instance "$VM_NAME")
     
     if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
-        # Create instance with SSH key
+        # Create cloud-init user-data to enable password SSH (vendor approach)
+        cat > /tmp/user-data-vm${i}.txt <<'USER_DATA_EOF'
+#cloud-config
+ssh_pwauth: True
+appdos:
+  bootstrap:
+    netplan:
+      dhcp4: true
+      dhcp6: false
+USER_DATA_EOF
+        
+        # Create instance with user-data (enables password SSH for appduser)
         INSTANCE_ID=$(aws ec2 run-instances \
             --image-id "$AMI_ID" \
             --instance-type "$VM_TYPE" \
             --subnet-id "$SUBNET_ID" \
             --security-group-ids "$VM_SG_ID" \
-            --key-name "${VM_SSH_KEY:-}" \
+            --user-data file:///tmp/user-data-vm${i}.txt \
             --block-device-mappings \
                 "DeviceName=/dev/sda1,Ebs={VolumeSize=${VM_OS_DISK},VolumeType=gp3,DeleteOnTermination=true}" \
                 "DeviceName=/dev/sdf,Ebs={VolumeSize=${VM_DATA_DISK},VolumeType=gp3,DeleteOnTermination=true}" \
             --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$VM_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" \
             --query 'Instances[0].InstanceId' --output text)
+        
+        # Clean up user-data file
+        rm -f /tmp/user-data-vm${i}.txt
         
         log_success "Instance created: $INSTANCE_ID"
     else

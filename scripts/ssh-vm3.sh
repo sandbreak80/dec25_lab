@@ -24,7 +24,7 @@ EOF
 }
 
 TEAM_NUMBER=""
-SSH_USER="ubuntu"  # AppDynamics VA AMI uses ubuntu as default SSH user
+SSH_USER="appduser"  # AppDynamics VA default user
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -49,17 +49,8 @@ if [[ -z "$VM3_IP" ]] || [[ "$VM3_IP" == "None" ]]; then
     exit 1
 fi
 
-if [[ -n "$VM_SSH_KEY" ]]; then
-    KEY_FILE="${HOME}/.ssh/${VM_SSH_KEY}.pem"
-else
-    KEY_FILE="${HOME}/.ssh/appd-lab-team${TEAM_NUMBER}-key.pem"
-fi
-
-if [[ ! -f "$KEY_FILE" ]]; then
-    log_error "SSH key not found: $KEY_FILE"
-    echo "Create your SSH key first: ./scripts/create-ssh-key.sh --team $TEAM_NUMBER"
-    exit 1
-fi
-
 log_info "Connecting to VM3: $VM3_IP"
-ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${VM3_IP}"
+log_info "User: $SSH_USER"
+log_warning "Password: Use team password (default: changeme, then AppDynamics123!)"
+echo ""
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${VM3_IP}"

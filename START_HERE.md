@@ -1,32 +1,10 @@
 # AppDynamics Lab - Quick Start Guide
 
-## 🚀 First Time Setup (Do This FIRST!)
+## 🚀 First Time Setup
 
-### Step 1: Create Your SSH Key
+### Step 1: Deploy Infrastructure
 
-**IMPORTANT**: Every team must create their own SSH key before deploying infrastructure.
-
-```bash
-# Run this command with your team number (1-5)
-./scripts/create-ssh-key.sh --team 1
-```
-
-**What this does:**
-- Creates a new AWS EC2 key pair: `appd-lab-team1-key`
-- Downloads private key to: `~/.ssh/appd-lab-team1-key.pem`
-- Sets proper permissions (400)
-- Updates your team config automatically
-
-**Security Note**: 
-- Do NOT commit this key to git (it's in `.gitignore`)
-- Do NOT share your private key
-- Each team gets their own unique key
-
----
-
-## 📦 Step 2: Deploy Infrastructure
-
-Once your SSH key is created, deploy your lab environment:
+Deploy your lab environment:
 
 ```bash
 ./lab-deploy.sh --team 1
@@ -42,7 +20,7 @@ Once your SSH key is created, deploy your lab environment:
 
 ---
 
-## 🔑 Step 3: Change appduser Password (REQUIRED!)
+## 🔑 Step 2: Change appduser Password (REQUIRED!)
 
 **CRITICAL**: Change the default password before bootstrap!
 
@@ -54,11 +32,18 @@ Once your SSH key is created, deploy your lab environment:
 - Sets password to: `AppDynamics123!`
 - Or specify custom: `./appd-change-password.sh --team 1 --password "YourPassword"`
 
-**Why?** The appduser account has forced password change on first login.
+**Why?** The appduser account has default password "changeme" that must be changed.
+
+**How SSH works:**
+- VMs are configured with password-based SSH (vendor approach)
+- No SSH keys needed - use password authentication
+- Default user: `appduser`
+- Initial password: `changeme`
+- Team password: `AppDynamics123!` (or custom)
 
 ---
 
-## 🔐 Step 4: Bootstrap VMs (REQUIRED!)
+## 🔐 Step 3: Bootstrap VMs (REQUIRED!)
 
 **CRITICAL**: VMs must be bootstrapped before AppDynamics can be installed!
 
@@ -76,7 +61,7 @@ Once your SSH key is created, deploy your lab environment:
 
 ---
 
-## 🔗 Step 5: Create AppDynamics Cluster
+## 🔗 Step 4: Create AppDynamics Cluster
 
 ```bash
 ./appd-create-cluster.sh --team 1
@@ -84,7 +69,7 @@ Once your SSH key is created, deploy your lab environment:
 
 ---
 
-## ⚙️ Step 6: Configure & Install AppDynamics
+## ⚙️ Step 5: Configure & Install AppDynamics
 
 ```bash
 # Configure cluster
@@ -96,7 +81,7 @@ Once your SSH key is created, deploy your lab environment:
 
 ---
 
-## 🌐 Step 7: Access Web UI
+## 🌐 Step 6: Access Web UI
 
 After deployment completes and AppDynamics is installed:
 
@@ -108,7 +93,7 @@ Password: welcome (change after first login)
 
 ---
 
-## 🧹 Step 8: Cleanup (End of Lab)
+## 🧹 Step 7: Cleanup (End of Lab)
 
 **IMPORTANT**: Delete all resources to avoid charges!
 
@@ -122,27 +107,14 @@ Password: welcome (change after first login)
 
 ## 🆘 Troubleshooting
 
-### "SSH key not found" Error
+### "Permission denied" SSH Error
 ```bash
-# Re-run the SSH key creation script
-./scripts/create-ssh-key.sh --team 1
-```
+# Make sure you changed the password first
+./appd-change-password.sh --team 1
 
-### "Permission denied (publickey)" Error
-```bash
-# Check key permissions
-ls -l ~/.ssh/appd-lab-team1-key.pem
-# Should be: -r-------- (400)
-
-# Fix if needed
-chmod 400 ~/.ssh/appd-lab-team1-key.pem
-```
-
-### "Key already exists in AWS"
-```bash
-# Delete old key and recreate
-aws ec2 delete-key-pair --key-name appd-lab-team1-key
-./scripts/create-ssh-key.sh --team 1
+# Then use the new password when prompted
+./scripts/ssh-vm1.sh --team 1
+# Password: AppDynamics123!
 ```
 
 ### Can't SSH from home/non-VPN
@@ -158,14 +130,16 @@ SSH is restricted to Cisco VPN IPs only. Connect to VPN first!
 
 ---
 
-## 🔑 SSH Key Summary
+## 🔑 SSH Access Summary
 
-| Team | Key Name | Key File Location |
-|------|----------|-------------------|
-| 1 | appd-lab-team1-key | `~/.ssh/appd-lab-team1-key.pem` |
-| 2 | appd-lab-team2-key | `~/.ssh/appd-lab-team2-key.pem` |
-| 3 | appd-lab-team3-key | `~/.ssh/appd-lab-team3-key.pem` |
-| 4 | appd-lab-team4-key | `~/.ssh/appd-lab-team4-key.pem` |
-| 5 | appd-lab-team5-key | `~/.ssh/appd-lab-team5-key.pem` |
+| Team | Username | Initial Password | Team Password |
+|------|----------|------------------|---------------|
+| All Teams | `appduser` | `changeme` | `AppDynamics123!` |
 
-**Remember**: Create your key BEFORE running `lab-deploy.sh`!
+**SSH Method:** Password-based authentication (no keys needed!)
+
+**To connect:**
+```bash
+ssh appduser@<VM-IP>
+# Password: AppDynamics123! (after running appd-change-password.sh)
+```

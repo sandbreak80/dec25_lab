@@ -57,16 +57,8 @@ fi
 load_team_config "$TEAM_NUMBER"
 check_aws_cli
 
-# Check SSH key exists
-if [[ -z "$VM_SSH_KEY" ]]; then
-    VM_SSH_KEY="appd-lab-team${TEAM_NUMBER}-key"
-fi
-
-KEY_FILE="${HOME}/.ssh/${VM_SSH_KEY}.pem"
-if [[ ! -f "$KEY_FILE" ]]; then
-    log_error "SSH key not found: $KEY_FILE"
-    exit 1
-fi
+# Note: We use sshpass for password-based SSH automation
+# Students will use their team password (set by appd-change-password.sh)
 
 log_info "Bootstrapping AppDynamics VMs for Team ${TEAM_NUMBER}..."
 echo ""
@@ -162,18 +154,22 @@ else
 fi
 BOOTSTRAP_EOF
 
-    # Copy and execute bootstrap script
-    scp -i "$KEY_FILE" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o LogLevel=ERROR \
-        /tmp/bootstrap-vm${VM_NUM}.sh ubuntu@${VM_IP}:/tmp/bootstrap.sh
-    
-    ssh -i "$KEY_FILE" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o LogLevel=ERROR \
-        ubuntu@${VM_IP} "chmod +x /tmp/bootstrap.sh && /tmp/bootstrap.sh" 2>&1 | sed 's/^/    /'
+    # Copy and execute bootstrap script (using password auth)
+    # Use expect for password automation
+    expect << EOF_EXPECT
+set timeout 30
+spawn scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /tmp/bootstrap-vm${VM_NUM}.sh appduser@${VM_IP}:/tmp/bootstrap.sh
+expect {
+    "password:" { send "AppDynamics123!\r"; exp_continue }
+    eof
+}
+
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "chmod +x /tmp/bootstrap.sh && sudo /tmp/bootstrap.sh"
+expect {
+    "password:" { send "AppDynamics123!\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
     
     # Clean up
     rm -f /tmp/bootstrap-vm${VM_NUM}.sh
@@ -196,11 +192,14 @@ for i in 1 2 3; do
     VM_IP="${!VM_IP_VAR}"
     
     echo "VM${i} Status:"
-    ssh -i "$KEY_FILE" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o LogLevel=ERROR \
-        ubuntu@${VM_IP} "appdctl show boot" 2>&1 | sed 's/^/  /'
+    expect << EOF_EXPECT
+set timeout 10
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "appdctl show boot"
+expect {
+    "password:" { send "AppDynamics123!\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
     echo ""
 done
 

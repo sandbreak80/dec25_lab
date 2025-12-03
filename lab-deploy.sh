@@ -266,20 +266,27 @@ cat << EOF
    Auth:       https://customer1-team${TEAM_NUMBER}.auth.splunkylabs.com/
 
 📝 Next Steps:
-   1. Wait 2-3 minutes for DNS propagation
-   
-   2. Change appduser password (REQUIRED!):
+   1. Change appduser password (REQUIRED!):
       ./appd-change-password.sh --team ${TEAM_NUMBER}
+      Default: changeme → AppDynamics123!
    
-   3. Bootstrap VMs (REQUIRED!):
+   2. Bootstrap VMs (wait for image extraction ~15 min):
       ./appd-bootstrap-vms.sh --team ${TEAM_NUMBER}
+   
+   3. Test SSH access:
+      ./scripts/ssh-vm1.sh --team ${TEAM_NUMBER}
+      Password: AppDynamics123!
    
    4. Create cluster:
       ./appd-create-cluster.sh --team ${TEAM_NUMBER}
    
-   5. Configure & install:
-      ./appd-configure.sh --team ${TEAM_NUMBER}
+   5. Install AppDynamics:
       ./appd-install.sh --team ${TEAM_NUMBER}
+      
+SSH Info:
+   User: appduser
+   Initial password: changeme
+   Team password: AppDynamics123! (after step 1)
 
 📚 Documentation:
    Quick Start:     ./docs/QUICK_START.md

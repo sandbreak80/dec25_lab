@@ -55,16 +55,8 @@ fi
 load_team_config "$TEAM_NUMBER"
 check_aws_cli
 
-# Check SSH key exists
-if [[ -z "$VM_SSH_KEY" ]]; then
-    VM_SSH_KEY="appd-lab-team${TEAM_NUMBER}-key"
-fi
-
-KEY_FILE="${HOME}/.ssh/${VM_SSH_KEY}.pem"
-if [[ ! -f "$KEY_FILE" ]]; then
-    log_error "SSH key not found: $KEY_FILE"
-    exit 1
-fi
+# Note: This uses expect to handle the initial "changeme" password
+# and set the new team password
 
 log_info "Changing appduser password on Team ${TEAM_NUMBER} VMs..."
 echo ""
@@ -88,12 +80,46 @@ change_password() {
     
     log_info "[$VM_NUM/3] Changing password on VM${VM_NUM}: $VM_IP"
     
-    # Change password using chpasswd (bypasses interactive prompt)
-    ssh -i "$KEY_FILE" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o LogLevel=ERROR \
-        ubuntu@${VM_IP} "echo 'appduser:${NEW_PASSWORD}' | sudo chpasswd && sudo chage -d 0 appduser && echo '✅ Password changed successfully'" 2>&1 | sed 's/^/    /'
+    # Use expect to handle password change from default "changeme"
+    expect << EOF_EXPECT 2>&1 | sed 's/^/    /'
+set timeout 30
+log_user 0
+
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP}
+
+expect {
+    "password:" {
+        send "changeme\r"
+        expect {
+            "Current password:" {
+                send "changeme\r"
+                expect "New password:"
+                send "${NEW_PASSWORD}\r"
+                expect "Retype new password:"
+                send "${NEW_PASSWORD}\r"
+                expect {
+                    "password updated successfully" {
+                        puts "✅ Password changed successfully"
+                        send "exit\r"
+                    }
+                    "$ " {
+                        puts "✅ Password changed successfully"
+                        send "exit\r"
+                    }
+                }
+            }
+            "$ " {
+                puts "Password already changed, updating..."
+                send "echo '${NEW_PASSWORD}' | sudo -S chpasswd <<< 'appduser:${NEW_PASSWORD}'\r"
+                expect "$ "
+                puts "✅ Password updated"
+                send "exit\r"
+            }
+        }
+    }
+}
+expect eof
+EOF_EXPECT
     
     if [ $? -eq 0 ]; then
         log_success "VM${VM_NUM} password changed!"
