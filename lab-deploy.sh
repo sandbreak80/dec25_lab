@@ -268,13 +268,16 @@ cat << EOF
 📝 Next Steps:
    1. Wait 2-3 minutes for DNS propagation
    
-   2. Bootstrap VMs (REQUIRED!):
+   2. Change appduser password (REQUIRED!):
+      ./appd-change-password.sh --team ${TEAM_NUMBER}
+   
+   3. Bootstrap VMs (REQUIRED!):
       ./appd-bootstrap-vms.sh --team ${TEAM_NUMBER}
    
-   3. Create cluster:
+   4. Create cluster:
       ./appd-create-cluster.sh --team ${TEAM_NUMBER}
    
-   4. Configure & install:
+   5. Configure & install:
       ./appd-configure.sh --team ${TEAM_NUMBER}
       ./appd-install.sh --team ${TEAM_NUMBER}
 

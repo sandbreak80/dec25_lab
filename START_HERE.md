@@ -42,7 +42,23 @@ Once your SSH key is created, deploy your lab environment:
 
 ---
 
-## 🔐 Step 3: Bootstrap VMs (REQUIRED!)
+## 🔑 Step 3: Change appduser Password (REQUIRED!)
+
+**CRITICAL**: Change the default password before bootstrap!
+
+```bash
+./appd-change-password.sh --team 1
+```
+
+**Default behavior:**
+- Sets password to: `AppDynamics123!`
+- Or specify custom: `./appd-change-password.sh --team 1 --password "YourPassword"`
+
+**Why?** The appduser account has forced password change on first login.
+
+---
+
+## 🔐 Step 4: Bootstrap VMs (REQUIRED!)
 
 **CRITICAL**: VMs must be bootstrapped before AppDynamics can be installed!
 
@@ -60,7 +76,7 @@ Once your SSH key is created, deploy your lab environment:
 
 ---
 
-## 🔗 Step 4: Create AppDynamics Cluster
+## 🔗 Step 5: Create AppDynamics Cluster
 
 ```bash
 ./appd-create-cluster.sh --team 1
@@ -68,7 +84,7 @@ Once your SSH key is created, deploy your lab environment:
 
 ---
 
-## ⚙️ Step 5: Configure & Install AppDynamics
+## ⚙️ Step 6: Configure & Install AppDynamics
 
 ```bash
 # Configure cluster
@@ -80,7 +96,7 @@ Once your SSH key is created, deploy your lab environment:
 
 ---
 
-## 🌐 Step 6: Access Web UI
+## 🌐 Step 7: Access Web UI
 
 After deployment completes and AppDynamics is installed:
 
@@ -92,7 +108,7 @@ Password: welcome (change after first login)
 
 ---
 
-## 🧹 Step 5: Cleanup (End of Lab)
+## 🧹 Step 8: Cleanup (End of Lab)
 
 **IMPORTANT**: Delete all resources to avoid charges!
 
