@@ -1,6 +1,5 @@
 #!/bin/bash
-# SSH to VM1 using team SSH key
-# Helper script for easy VM access
+# SSH to VM3 using team SSH key
 
 set -e
 
@@ -10,7 +9,7 @@ source "${SCRIPT_DIR}/lib/common.sh"
 show_usage() {
     cat << EOF
 ╔══════════════════════════════════════════════════════════╗
-║  SSH to VM1 (Primary Node)                              ║
+║  SSH to VM3 (Tertiary Node)                             ║
 ╚══════════════════════════════════════════════════════════╝
 
 Usage: $0 --team TEAM_NUMBER [--user USERNAME]
@@ -19,10 +18,6 @@ Arguments:
     --team, -t NUMBER    Your team number (1-5)
     --user, -u USERNAME  SSH user (default: appduser)
     --help, -h           Show this help
-
-Examples:
-    $0 --team 1
-    $0 --team 1 --user appduser
 
 EOF
     exit 1
@@ -47,18 +42,13 @@ fi
 
 load_team_config "$TEAM_NUMBER"
 
-# Get VM1 IP
-VM1_IP=$(cat "state/team${TEAM_NUMBER}/vm1-public-ip.txt" 2>/dev/null || echo "")
+VM3_IP=$(cat "state/team${TEAM_NUMBER}/vm3-public-ip.txt" 2>/dev/null || echo "")
 
-if [[ -z "$VM1_IP" ]] || [[ "$VM1_IP" == "None" ]]; then
-    log_error "VM1 IP not found. Has the infrastructure been deployed?"
-    echo ""
-    echo "Deploy first:"
-    echo "  ./lab-deploy.sh --team $TEAM_NUMBER"
+if [[ -z "$VM3_IP" ]] || [[ "$VM3_IP" == "None" ]]; then
+    log_error "VM3 IP not found. Has the infrastructure been deployed?"
     exit 1
 fi
 
-# Determine key file
 if [[ -n "$VM_SSH_KEY" ]]; then
     KEY_FILE="${HOME}/.ssh/${VM_SSH_KEY}.pem"
 else
@@ -67,19 +57,9 @@ fi
 
 if [[ ! -f "$KEY_FILE" ]]; then
     log_error "SSH key not found: $KEY_FILE"
-    echo ""
-    echo "Create your SSH key first:"
-    echo "  ./scripts/create-ssh-key.sh --team $TEAM_NUMBER"
+    echo "Create your SSH key first: ./scripts/create-ssh-key.sh --team $TEAM_NUMBER"
     exit 1
 fi
 
-# SSH to VM1
-log_info "Connecting to VM1: $VM1_IP"
-log_info "User: $SSH_USER"
-log_info "Key: $KEY_FILE"
-echo ""
-
-ssh -i "$KEY_FILE" \
-    -o StrictHostKeyChecking=no \
-    -o UserKnownHostsFile=/dev/null \
-    "${SSH_USER}@${VM1_IP}"
+log_info "Connecting to VM3: $VM3_IP"
+ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${VM3_IP}"

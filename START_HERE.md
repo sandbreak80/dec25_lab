@@ -1,108 +1,140 @@
-# AppDynamics Multi-Team Lab - Quick Start 🚀
+# AppDynamics Lab - Quick Start Guide
 
-## Welcome! 👋
+## 🚀 First Time Setup (Do This FIRST!)
 
-You're about to build a **complete, production-grade AppDynamics deployment** on AWS!
+### Step 1: Create Your SSH Key
 
----
-
-## ⚡ **Prerequisites (5 Minutes)**
-
-### 1. Connect to Cisco VPN
-- Open **Cisco AnyConnect**
-- Connect to **US-West** or **US-East**
-- Verify: `curl ifconfig.me` (should show `151.186.x.x`)
-
-### 2. Get Your Team Number
-- Instructor assigns: **Team 1, 2, 3, 4, or 5**
-- Write it down: **Team ___**
-
-### 3. Have AWS Credentials Ready
-- Instructor provides IAM credentials
-- Keep them handy
-
----
-
-## 🚀 **Deploy in 7 Commands** (~3.5 hours)
+**IMPORTANT**: Every team must create their own SSH key before deploying infrastructure.
 
 ```bash
-# 1. Deploy AWS Infrastructure (30 min - automated)
+# Run this command with your team number (1-5)
+./scripts/create-ssh-key.sh --team 1
+```
+
+**What this does:**
+- Creates a new AWS EC2 key pair: `appd-lab-team1-key`
+- Downloads private key to: `~/.ssh/appd-lab-team1-key.pem`
+- Sets proper permissions (400)
+- Updates your team config automatically
+
+**Security Note**: 
+- Do NOT commit this key to git (it's in `.gitignore`)
+- Do NOT share your private key
+- Each team gets their own unique key
+
+---
+
+## 📦 Step 2: Deploy Infrastructure
+
+Once your SSH key is created, deploy your lab environment:
+
+```bash
 ./lab-deploy.sh --team 1
+```
 
-# 2. Bootstrap VMs (1 hr - guided)
-./appd-bootstrap-vms.sh --team 1
+**This takes ~30 minutes and creates:**
+- ✅ VPC with 2 subnets
+- ✅ 3 VMs (m5a.4xlarge: 16 vCPU, 64GB RAM each)
+- ✅ Application Load Balancer
+- ✅ SSL certificate (*.splunkylabs.com)
+- ✅ DNS records (team1.splunkylabs.com)
+- ✅ Security groups (SSH restricted to Cisco VPN)
 
-# 3. Create Kubernetes Cluster (15 min - guided)
-./appd-create-cluster.sh --team 1
+---
 
-# 4. Configure AppDynamics (10 min - automated)
-./appd-configure.sh --team 1
+## 🔐 Step 3: Connect to Your VMs
 
-# 5. Install AppDynamics (30 min - guided)
-./appd-install.sh --team 1
+### Easy Method (Recommended)
+Use the helper scripts:
 
-# 6. Verify & Access (5 min)
-./appd-check-health.sh --team 1
+```bash
+# Connect to VM1 (primary node)
+./scripts/ssh-vm1.sh --team 1
 
-# 7. Cleanup at End of Day (5 min - REQUIRED!)
-./lab-cleanup.sh --team 1 --confirm
+# Connect to VM2
+./scripts/ssh-vm2.sh --team 1
+
+# Connect to VM3
+./scripts/ssh-vm3.sh --team 1
+```
+
+### Manual Method
+```bash
+ssh -i ~/.ssh/appd-lab-team1-key.pem appduser@<VM-IP>
 ```
 
 ---
 
-## 🌐 **Access Your Controller**
+## 🌐 Step 4: Access Web UI
 
-After installation completes:
+After deployment completes and AppDynamics is installed:
 
 ```
-URL:      https://controller-team1.splunkylabs.com/controller/
+Controller: https://controller-team1.splunkylabs.com/controller/
 Username: admin
-Password: welcome (change immediately!)
+Password: welcome (change after first login)
 ```
 
 ---
 
-## 📚 **Documentation**
+## 🧹 Step 5: Cleanup (End of Lab)
 
-- **This file** - Quick overview
-- **lab/docs/student/QUICK_START.md** - Complete step-by-step guide
-- **lab/docs/student/QUICK_REFERENCE.md** - Command cheat sheet
-- **lab/docs/student/TROUBLESHOOTING.md** - Common issues
+**IMPORTANT**: Delete all resources to avoid charges!
 
----
-
-## 🆘 **Need Help?**
-
-1. Check documentation in `lab/docs/student/`
-2. Run: `./scripts/helpers/check-status.sh --team 1`
-3. Ask your team members
-4. Ask the instructor
-
----
-
-## ⚠️ **IMPORTANT**
-
-**You MUST run cleanup at end of day:**
 ```bash
 ./lab-cleanup.sh --team 1 --confirm
 ```
 
-**Why?** Resources cost ~$2.50/hour if left running!
-That's ~$60/day per team! 💰
+**Cost**: ~$2.50/hour = ~$20 for 8-hour lab day
 
 ---
 
-## 🎯 **What You'll Learn**
+## 🆘 Troubleshooting
 
-- ✅ AWS VPC design and deployment
-- ✅ Load balancer configuration with SSL
-- ✅ Kubernetes cluster creation
-- ✅ Enterprise software installation
-- ✅ Production troubleshooting
-- ✅ Cloud cost management
+### "SSH key not found" Error
+```bash
+# Re-run the SSH key creation script
+./scripts/create-ssh-key.sh --team 1
+```
 
-**Ready to build?** Let's go! 🚀
+### "Permission denied (publickey)" Error
+```bash
+# Check key permissions
+ls -l ~/.ssh/appd-lab-team1-key.pem
+# Should be: -r-------- (400)
+
+# Fix if needed
+chmod 400 ~/.ssh/appd-lab-team1-key.pem
+```
+
+### "Key already exists in AWS"
+```bash
+# Delete old key and recreate
+aws ec2 delete-key-pair --key-name appd-lab-team1-key
+./scripts/create-ssh-key.sh --team 1
+```
+
+### Can't SSH from home/non-VPN
+SSH is restricted to Cisco VPN IPs only. Connect to VPN first!
 
 ---
 
-**Questions?** See `lab/docs/student/` for complete guides!
+## 📚 Full Documentation
+
+- **Lab Guide**: `./docs/LAB_GUIDE.md` - Complete step-by-step instructions
+- **Quick Reference**: `./docs/QUICK_REFERENCE.md` - Common commands
+- **Instructor Guide**: `./INSTRUCTOR_GUIDE.md` - Setup and management
+
+---
+
+## 🔑 SSH Key Summary
+
+| Team | Key Name | Key File Location |
+|------|----------|-------------------|
+| 1 | appd-lab-team1-key | `~/.ssh/appd-lab-team1-key.pem` |
+| 2 | appd-lab-team2-key | `~/.ssh/appd-lab-team2-key.pem` |
+| 3 | appd-lab-team3-key | `~/.ssh/appd-lab-team3-key.pem` |
+| 4 | appd-lab-team4-key | `~/.ssh/appd-lab-team4-key.pem` |
+| 5 | appd-lab-team5-key | `~/.ssh/appd-lab-team5-key.pem` |
+
+**Remember**: Create your key BEFORE running `lab-deploy.sh`!
