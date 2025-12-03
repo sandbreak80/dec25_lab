@@ -1,0 +1,7 @@
+ALB_ARN=arn:aws:elasticloadbalancing:us-west-2:314839308236:loadbalancer/app/appd-va-alb/98538d04bc60d44c
+ALB_DNS=appd-va-alb-1574910789.us-west-2.elb.amazonaws.com
+ALB_ZONE_ID=Z1H1FL5HABSF5
+TG_ARN=arn:aws:elasticloadbalancing:us-west-2:314839308236:targetgroup/appd-va-tg/825cc274735b57ce
+HTTPS_LISTENER=arn:aws:elasticloadbalancing:us-west-2:314839308236:listener/app/appd-va-alb/98538d04bc60d44c/561cb8e9b3cdb44c
+HTTP_LISTENER=arn:aws:elasticloadbalancing:us-west-2:314839308236:listener/app/appd-va-alb/98538d04bc60d44c/b187520d2a3028be
+CERT_ARN=arn:aws:acm:us-west-2:314839308236:certificate/ce4f1e3b-0830-48f2-b187-a26c580637e0

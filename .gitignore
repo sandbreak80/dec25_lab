@@ -1,0 +1,98 @@
+# AppDynamics Lab - Git Ignore
+
+# State files (team-specific runtime data)
+state/
+
+# AMI files (large binary files)
+*.ami
+*.ova
+*.vmdk
+
+# License files (confidential)
+*.lic
+license.lic
+
+# AWS credentials (never commit!)
+.aws/
+credentials
+*.pem
+*.key
+
+# Downloaded config backups
+globals.yaml.gotmpl.original
+globals.yaml.gotmpl.updated
+secrets.yaml.*
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+*.swp
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Python (if any helper scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Node (if any)
+node_modules/
+npm-debug.log*
+
+# Team-specific state directories
+state/team1/
+state/team2/
+state/team3/
+state/team4/
+state/team5/
+
+# Backup files
+*.backup
+*-backup
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+screenshots/
+
+# Actual team configs with real IPs/credentials (optional - remove if you want to commit)
+# Uncomment these if configs contain sensitive data:
+# config/team1.cfg
+# config/team2.cfg
+# config/team3.cfg
+# config/team4.cfg
+# config/team5.cfg
+
+# Original vendor files (keep template only)
+# Uncomment if you don't want to track vendor originals:
+# 01-aws-create-profile.sh
+# 02-aws-add-vpc.sh
+# 03-aws-create-image-bucket.sh
+# 04-aws-import-iam-role.sh
+# 05-aws-upload-image.sh
+# 06-aws-import-snapshot.sh
+# 07-aws-register-snapshot.sh
+# 08-aws-create-vms.sh
+
+# Documentation drafts
+*.draft.md
+DRAFT_*.md
+
+# Test outputs
+test-output/
+debug-*

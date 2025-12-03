@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+# Create cluster after VMs are bootstrapped
+
+source config.cfg
+
+echo "========================================="
+echo "Create AppDynamics VA Cluster"
+echo "========================================="
+echo ""
+
+# Check if we can SSH without password
+if ! ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o BatchMode=yes appduser@$NODE1_PUBLIC_IP "exit" 2>/dev/null; then
+    echo "⚠️  SSH keys not set up yet."
+    echo ""
+    echo "You'll need to enter the SSH password (changeme) multiple times."
+    echo ""
+    echo "To avoid this, set up SSH keys first:"
+    echo "  ssh-copy-id appduser@$NODE1_PUBLIC_IP"
+    echo "  ssh-copy-id appduser@$NODE2_PUBLIC_IP"
+    echo "  ssh-copy-id appduser@$NODE3_PUBLIC_IP"
+    echo ""
+    read -p "Press Enter to continue anyway, or Ctrl+C to cancel..."
+fi
+
+echo ""
+echo "Cluster Configuration:"
+echo "  Primary Node: $NODE1_IP (VM 1)"
+echo "  Secondary Nodes: $NODE2_IP (VM 2), $NODE3_IP (VM 3)"
+echo ""
+echo "This will:"
+echo "  1. Initialize cluster on primary node"
+echo "  2. Join secondary nodes to cluster"
+echo "  3. Verify cluster status"
+echo ""
+
+# Manual instructions
+echo "========================================="
+echo "MANUAL STEPS REQUIRED"
+echo "========================================="
+echo ""
+echo "SSH to the PRIMARY node (VM 1):"
+echo "  ssh appduser@$NODE1_PUBLIC_IP"
+echo ""
+echo "Run the cluster init command:"
+echo "  appdctl cluster init $NODE2_IP $NODE3_IP"
+echo ""
+echo "Wait for cluster to form (1-2 minutes)"
+echo ""
+echo "Verify cluster status:"
+echo "  appdctl show cluster"
+echo "  microk8s status"
+echo ""
+echo "Expected output:"
+echo "  NODE           | ROLE  | RUNNING"
+echo "  ---------------+-------+---------"
+echo "  $NODE1_IP:19001 | voter | true"
+echo "  $NODE2_IP:19001 | voter | true"
+echo "  $NODE3_IP:19001 | voter | true"
+echo ""
+echo "All nodes should show 'RUNNING: true'"
+echo ""
+echo "========================================="
+echo "After Cluster is Created"
+echo "========================================="
+echo ""
+echo "Proceed with AppDynamics service installation:"
+echo "  1. Configure /var/appd/config/globals.yaml.gotmpl"
+echo "  2. Configure /var/appd/config/secrets.yaml"
+echo "  3. Copy license to /var/appd/config/license.lic"
+echo "  4. Run: appdcli start appd small"
+echo ""

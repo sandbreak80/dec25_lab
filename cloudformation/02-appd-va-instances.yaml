@@ -1,0 +1,333 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AppDynamics Virtual Appliance - EC2 Instances (3-node cluster)'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: 'appd-va'
+    Description: Environment name (must match infrastructure stack)
+    
+  AMIId:
+    Type: String
+    Description: AppDynamics VA AMI ID (from snapshot registration)
+    
+  VMInstanceType:
+    Type: String
+    Default: 'm5a.4xlarge'
+    AllowedValues:
+      - m5a.4xlarge
+      - m5a.8xlarge
+      - m5.4xlarge
+      - m5.8xlarge
+    Description: EC2 instance type
+    
+  VMOSDiskSize:
+    Type: Number
+    Default: 200
+    MinValue: 200
+    Description: OS disk size in GB
+    
+  VMDataDiskSize:
+    Type: Number
+    Default: 500
+    MinValue: 500
+    Description: Data disk size in GB
+    
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 KeyPair for SSH access (optional but recommended)
+    
+  ResourceOwner:
+    Type: String
+    Default: 'tbd@xyz.com'
+    Description: Email of resource owner
+    
+  DeploymentEnvironment:
+    Type: String
+    Default: 'Sandbox'
+    Description: Deployment environment
+
+Resources:
+  # ========================================
+  # Data Volumes (EBS)
+  # ========================================
+  
+  DataVolume1:
+    Type: AWS::EC2::Volume
+    Properties:
+      Size: !Ref VMDataDiskSize
+      VolumeType: gp3
+      Encrypted: true
+      AvailabilityZone: !GetAtt Instance1.AvailabilityZone
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-vm1-data'
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+    DeletionPolicy: Snapshot
+  
+  DataVolume2:
+    Type: AWS::EC2::Volume
+    Properties:
+      Size: !Ref VMDataDiskSize
+      VolumeType: gp3
+      Encrypted: true
+      AvailabilityZone: !GetAtt Instance2.AvailabilityZone
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-vm2-data'
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+    DeletionPolicy: Snapshot
+  
+  DataVolume3:
+    Type: AWS::EC2::Volume
+    Properties:
+      Size: !Ref VMDataDiskSize
+      VolumeType: gp3
+      Encrypted: true
+      AvailabilityZone: !GetAtt Instance3.AvailabilityZone
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-vm3-data'
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+    DeletionPolicy: Snapshot
+  
+  # ========================================
+  # EC2 Instances
+  # ========================================
+  
+  Instance1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AMIId
+      InstanceType: !Ref VMInstanceType
+      KeyName: !Ref KeyPairName
+      SubnetId:
+        Fn::ImportValue: !Sub '${EnvironmentName}-Subnet-ID'
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub '${EnvironmentName}-SG-ID'
+      IamInstanceProfile:
+        Fn::ImportValue: !Sub '${EnvironmentName}-EC2-Profile'
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref VMOSDiskSize
+            VolumeType: gp3
+            DeleteOnTermination: true
+            Encrypted: true
+      MetadataOptions:
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Bootstrap script for AppDynamics VA
+          echo "AppDynamics VA Node 1 - Bootstrap starting..."
+          
+          # Wait for data volume attachment
+          while [ ! -e /dev/xvdf ]; do
+            echo "Waiting for data volume..."
+            sleep 5
+          done
+          
+          echo "Data volume detected. Ready for appdctl host init"
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-vm-1'
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+        - Key: AppDRole
+          Value: Primary
+  
+  Instance2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AMIId
+      InstanceType: !Ref VMInstanceType
+      KeyName: !Ref KeyPairName
+      SubnetId:
+        Fn::ImportValue: !Sub '${EnvironmentName}-Subnet-ID'
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub '${EnvironmentName}-SG-ID'
+      IamInstanceProfile:
+        Fn::ImportValue: !Sub '${EnvironmentName}-EC2-Profile'
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref VMOSDiskSize
+            VolumeType: gp3
+            DeleteOnTermination: true
+            Encrypted: true
+      MetadataOptions:
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          echo "AppDynamics VA Node 2 - Bootstrap starting..."
+          while [ ! -e /dev/xvdf ]; do
+            echo "Waiting for data volume..."
+            sleep 5
+          done
+          echo "Data volume detected. Ready for appdctl host init"
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-vm-2'
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+        - Key: AppDRole
+          Value: Secondary
+  
+  Instance3:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AMIId
+      InstanceType: !Ref VMInstanceType
+      KeyName: !Ref KeyPairName
+      SubnetId:
+        Fn::ImportValue: !Sub '${EnvironmentName}-Subnet-ID'
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub '${EnvironmentName}-SG-ID'
+      IamInstanceProfile:
+        Fn::ImportValue: !Sub '${EnvironmentName}-EC2-Profile'
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref VMOSDiskSize
+            VolumeType: gp3
+            DeleteOnTermination: true
+            Encrypted: true
+      MetadataOptions:
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          echo "AppDynamics VA Node 3 - Bootstrap starting..."
+          while [ ! -e /dev/xvdf ]; do
+            echo "Waiting for data volume..."
+            sleep 5
+          done
+          echo "Data volume detected. Ready for appdctl host init"
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-vm-3'
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+        - Key: AppDRole
+          Value: Secondary
+  
+  # ========================================
+  # Volume Attachments
+  # ========================================
+  
+  VolumeAttachment1:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      Device: /dev/xvdf
+      InstanceId: !Ref Instance1
+      VolumeId: !Ref DataVolume1
+  
+  VolumeAttachment2:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      Device: /dev/xvdf
+      InstanceId: !Ref Instance2
+      VolumeId: !Ref DataVolume2
+  
+  VolumeAttachment3:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      Device: /dev/xvdf
+      InstanceId: !Ref Instance3
+      VolumeId: !Ref DataVolume3
+
+Outputs:
+  Instance1Id:
+    Description: Instance 1 ID
+    Value: !Ref Instance1
+    Export:
+      Name: !Sub '${EnvironmentName}-Instance1-ID'
+  
+  Instance1PrivateIP:
+    Description: Instance 1 Private IP
+    Value: !GetAtt Instance1.PrivateIp
+    Export:
+      Name: !Sub '${EnvironmentName}-Instance1-PrivateIP'
+  
+  Instance1PublicIP:
+    Description: Instance 1 Public IP
+    Value: !GetAtt Instance1.PublicIp
+    Export:
+      Name: !Sub '${EnvironmentName}-Instance1-PublicIP'
+  
+  Instance2Id:
+    Description: Instance 2 ID
+    Value: !Ref Instance2
+    Export:
+      Name: !Sub '${EnvironmentName}-Instance2-ID'
+  
+  Instance2PrivateIP:
+    Description: Instance 2 Private IP
+    Value: !GetAtt Instance2.PrivateIp
+    Export:
+      Name: !Sub '${EnvironmentName}-Instance2-PrivateIP'
+  
+  Instance2PublicIP:
+    Description: Instance 2 Public IP
+    Value: !GetAtt Instance2.PublicIp
+    Export:
+      Name: !Sub '${EnvironmentName}-Instance2-PublicIP'
+  
+  Instance3Id:
+    Description: Instance 3 ID
+    Value: !Ref Instance3
+    Export:
+      Name: !Sub '${EnvironmentName}-Instance3-ID'
+  
+  Instance3PrivateIP:
+    Description: Instance 3 Private IP
+    Value: !GetAtt Instance3.PrivateIp
+    Export:
+      Name: !Sub '${EnvironmentName}-Instance3-PrivateIP'
+  
+  Instance3PublicIP:
+    Description: Instance 3 Public IP
+    Value: !GetAtt Instance3.PublicIp
+    Export:
+      Name: !Sub '${EnvironmentName}-Instance3-PublicIP'
+  
+  NextSteps:
+    Description: Bootstrap instructions
+    Value: !Sub |
+      EC2 instances created successfully!
+      
+      Bootstrap each node:
+      1. SSH to each instance: ssh appduser@<IP> (password: changeme)
+      2. Run: sudo appdctl host init
+      3. Configure network settings when prompted
+      
+      Create cluster (on primary node):
+      1. SSH to instance 1: ssh appduser@${Instance1.PublicIp}
+      2. Run: appdctl cluster init ${Instance2.PrivateIp} ${Instance3.PrivateIp}
+      3. Verify: appdctl show cluster
+      
+      Install services:
+      1. Edit /var/appd/config/globals.yaml.gotmpl
+      2. Edit /var/appd/config/secrets.yaml
+      3. Copy license to /var/appd/config/license.lic
+      4. Run: appdcli start appd small

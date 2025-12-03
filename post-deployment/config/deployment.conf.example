@@ -1,0 +1,117 @@
+# AppDynamics Virtual Appliance Deployment Configuration
+# Copy this file to deployment.conf and customize for your environment
+
+# ============================================
+# Environment Information
+# ============================================
+ENVIRONMENT_NAME="appd-va"
+DEPLOYMENT_PROFILE="small"  # Options: small, medium, large
+
+# ============================================
+# Network Configuration
+# ============================================
+DNS_DOMAIN="va.mycompany.com"
+TENANT_NAME="customer1"
+INGRESS_IP="10.0.0.100"  # IP where AppD services will be accessible
+
+# ============================================
+# Node Configuration
+# ============================================
+# These should be populated from your AWS deployment
+NODE1_IP="10.0.0.10"
+NODE1_HOSTNAME="appdva-vm-1"
+
+NODE2_IP="10.0.0.11"
+NODE2_HOSTNAME="appdva-vm-2"
+
+NODE3_IP="10.0.0.12"
+NODE3_HOSTNAME="appdva-vm-3"
+
+# ============================================
+# Network Settings
+# ============================================
+GATEWAY_IP="10.0.0.1"
+DNS_SERVER="8.8.8.8"
+CIDR_MASK="24"
+
+# ============================================
+# Services to Install
+# ============================================
+INSTALL_CORE=true          # Controller, Events, EUM (required)
+INSTALL_AIOPS=true         # Anomaly Detection
+INSTALL_OTIS=false         # OpenTelemetry
+INSTALL_ATD=false          # Automatic Transaction Diagnostics
+INSTALL_UIL=false          # Universal Integration Layer (for Splunk)
+
+# ============================================
+# Certificate Configuration
+# ============================================
+USE_CUSTOM_CERTS=false
+CERT_PATH=""               # Path to certificate file (if USE_CUSTOM_CERTS=true)
+KEY_PATH=""                # Path to private key file (if USE_CUSTOM_CERTS=true)
+
+# ============================================
+# License Configuration
+# ============================================
+LICENSE_FILE_PATH=""       # Path to license.lic file (optional, can apply later)
+
+# ============================================
+# AWS Configuration (if using AWS)
+# ============================================
+AWS_PROFILE="va-deployment"
+AWS_REGION="us-west-2"
+
+# Populate these from CloudFormation outputs or AWS scripts
+AWS_INSTANCE1_ID=""
+AWS_INSTANCE2_ID=""
+AWS_INSTANCE3_ID=""
+
+# ============================================
+# Advanced Configuration
+# ============================================
+
+# Admin credentials (will be auto-generated if left empty)
+ADMIN_PASSWORD=""
+
+# SSH Configuration
+SSH_USER="appduser"
+SSH_KEY_PATH=""  # Leave empty to use default SSH key
+
+# Timeouts (in seconds)
+BOOTSTRAP_TIMEOUT=300
+CLUSTER_TIMEOUT=600
+SERVICE_INSTALL_TIMEOUT=3600
+
+# Retry Configuration
+MAX_RETRIES=3
+RETRY_DELAY=10
+
+# ============================================
+# Feature Flags
+# ============================================
+ENABLE_MONITORING=true     # Install cluster agent for self-monitoring
+SKIP_DNS_CHECK=false       # Skip DNS validation (not recommended)
+SKIP_PREFLIGHT=false       # Skip pre-flight checks (not recommended)
+DRY_RUN=false             # Show what would be done without executing
+
+# ============================================
+# Logging
+# ============================================
+LOG_DIR="/var/log/appd-deployment"
+LOG_LEVEL="INFO"  # Options: DEBUG, INFO, WARN, ERROR
+
+# ============================================
+# Notes
+# ============================================
+# 1. DNS must be configured BEFORE running installation
+#    Required DNS records:
+#      - ${TENANT_NAME}.auth.${DNS_DOMAIN} → ${INGRESS_IP}
+#      - ${TENANT_NAME}-tnt-authn.${DNS_DOMAIN} → ${INGRESS_IP}
+#
+# 2. Default VM password is 'changeme' - change it!
+#
+# 3. For production deployments, use custom certificates
+#
+# 4. Generate strong passwords for production
+#
+# 5. License can be applied after installation if not provided now

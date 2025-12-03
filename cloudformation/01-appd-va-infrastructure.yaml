@@ -1,0 +1,405 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AppDynamics Virtual Appliance - Complete Infrastructure Deployment'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: 'appd-va'
+    Description: Environment name prefix for all resources
+    
+  VpcCIDR:
+    Type: String
+    Default: '10.0.0.0/16'
+    Description: CIDR block for VPC
+    
+  SubnetCIDR:
+    Type: String
+    Default: '10.0.0.0/24'
+    Description: CIDR block for subnet
+    
+  ResourceOwner:
+    Type: String
+    Default: 'tbd@xyz.com'
+    Description: Email of resource owner for tagging
+    
+  DeploymentEnvironment:
+    Type: String
+    Default: 'Sandbox'
+    AllowedValues:
+      - Sandbox
+      - Development
+      - Staging
+      - Production
+    Description: Deployment environment type
+    
+  AppDImageBucketName:
+    Type: String
+    Description: S3 bucket name for AppDynamics images (must be globally unique)
+    
+  AppDImageFileName:
+    Type: String
+    Default: 'appd_va_25.4.0.2016.ami'
+    Description: AppDynamics VA image file name
+    
+  AppDImageName:
+    Type: String
+    Default: 'appd-va-25.4.0.2016-ec2-disk1'
+    Description: Name for the registered AMI
+    
+  VMInstanceType:
+    Type: String
+    Default: 'm5a.4xlarge'
+    AllowedValues:
+      - m5a.4xlarge
+      - m5a.8xlarge
+      - m5.4xlarge
+      - m5.8xlarge
+    Description: EC2 instance type for VA nodes (must meet sizing requirements)
+    
+  VMOSDiskSize:
+    Type: Number
+    Default: 200
+    MinValue: 200
+    Description: OS disk size in GB
+    
+  VMDataDiskSize:
+    Type: Number
+    Default: 500
+    MinValue: 500
+    Description: Data disk size in GB
+    
+  AllowedIPRanges:
+    Type: CommaDelimitedList
+    Default: '10.1.11.10/32,10.1.12.10/32'
+    Description: Comma-separated list of IP CIDR blocks allowed to access VMs
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Network Configuration"
+        Parameters:
+          - EnvironmentName
+          - VpcCIDR
+          - SubnetCIDR
+      - Label:
+          default: "AppDynamics Image Configuration"
+        Parameters:
+          - AppDImageBucketName
+          - AppDImageFileName
+          - AppDImageName
+      - Label:
+          default: "Virtual Machine Configuration"
+        Parameters:
+          - VMInstanceType
+          - VMOSDiskSize
+          - VMDataDiskSize
+      - Label:
+          default: "Security & Access"
+        Parameters:
+          - AllowedIPRanges
+      - Label:
+          default: "Tags"
+        Parameters:
+          - ResourceOwner
+          - DeploymentEnvironment
+
+Resources:
+  # ========================================
+  # VPC and Networking
+  # ========================================
+  
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-vpc'
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+  
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-igw'
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+  
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref SubnetCIDR
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-subnet'
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+  
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-rt'
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+  
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+  
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${EnvironmentName}-sg'
+      GroupDescription: Security group for AppDynamics Virtual Appliance
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        # SSH
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Select [0, !Ref AllowedIPRanges]
+          Description: SSH access
+        # HTTPS
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Select [0, !Ref AllowedIPRanges]
+          Description: HTTPS access
+        # Controller UI
+        - IpProtocol: tcp
+          FromPort: 8090
+          ToPort: 8090
+          CidrIp: !Select [0, !Ref AllowedIPRanges]
+          Description: Controller UI
+        # Additional ports as needed for AppD services
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-sg'
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+  
+  # Allow instances in same security group to communicate
+  SecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref SecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref SecurityGroup
+      Description: Allow all traffic within security group
+  
+  # ========================================
+  # S3 Bucket for Image Storage
+  # ========================================
+  
+  ImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref AppDImageBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 30
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-image-bucket'
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+  
+  # ========================================
+  # IAM Roles and Policies
+  # ========================================
+  
+  VMImportRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: vmimport
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: vmie.amazonaws.com
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'sts:ExternalId': vmimport
+      Policies:
+        - PolicyName: vmimport
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetBucketLocation'
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                Resource:
+                  - !GetAtt ImageBucket.Arn
+                  - !Sub '${ImageBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:ModifySnapshotAttribute'
+                  - 'ec2:CopySnapshot'
+                  - 'ec2:RegisterImage'
+                  - 'ec2:Describe*'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ebs:CompleteSnapshot'
+                  - 'ebs:GetSnapshotBlock'
+                  - 'ebs:ListChangedBlocks'
+                  - 'ebs:ListSnapshotBlocks'
+                  - 'ebs:PutSnapshotBlock'
+                  - 'ebs:StartSnapshot'
+                Resource: '*'
+      Tags:
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+  
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${EnvironmentName}-ec2-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                Resource:
+                  - !Sub '${ImageBucket.Arn}/*'
+      Tags:
+        - Key: ResourceOwner
+          Value: !Ref ResourceOwner
+        - Key: DeploymentEnvironment
+          Value: !Ref DeploymentEnvironment
+  
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub '${EnvironmentName}-ec2-profile'
+      Roles:
+        - !Ref EC2InstanceRole
+
+  # ========================================
+  # Note: Snapshot import and AMI registration
+  # require custom resources or manual steps
+  # See outputs for manual import commands
+  # ========================================
+
+Outputs:
+  VPCId:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: !Sub '${EnvironmentName}-VPC-ID'
+  
+  SubnetId:
+    Description: Subnet ID
+    Value: !Ref PublicSubnet
+    Export:
+      Name: !Sub '${EnvironmentName}-Subnet-ID'
+  
+  SecurityGroupId:
+    Description: Security Group ID
+    Value: !Ref SecurityGroup
+    Export:
+      Name: !Sub '${EnvironmentName}-SG-ID'
+  
+  ImageBucketName:
+    Description: S3 Bucket for AppDynamics Images
+    Value: !Ref ImageBucket
+    Export:
+      Name: !Sub '${EnvironmentName}-Image-Bucket'
+  
+  VMImportRoleArn:
+    Description: IAM Role ARN for VM Import
+    Value: !GetAtt VMImportRole.Arn
+  
+  NextSteps:
+    Description: Manual steps required to complete deployment
+    Value: !Sub |
+      Infrastructure created successfully!
+      
+      Next steps:
+      1. Upload AppD VA image to S3:
+         aws s3 cp ${AppDImageFileName} s3://${ImageBucket}/
+      
+      2. Import snapshot:
+         aws ec2 import-snapshot --disk-container Description=${AppDImageName},Format=RAW,Url=s3://${ImageBucket}/${AppDImageFileName}
+      
+      3. After import completes, register AMI:
+         aws ec2 register-image --name ${AppDImageName} --architecture x86_64 --root-device-name /dev/sda1 --block-device-mappings DeviceName=/dev/sda1,Ebs={SnapshotId=SNAPSHOT_ID}
+      
+      4. Create EC2 instances using the second CloudFormation template (appd-va-instances.yaml)
+      
+      Or use the provided bash scripts with these resource IDs.
