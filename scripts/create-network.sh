@@ -38,14 +38,8 @@ log_success "Internet Gateway created: $IGW_ID"
 # Create Subnet 1 (AZ-a)
 log_info "[3/5] Creating Subnet 1 (${SUBNET_CIDR} in ${SUBNET_AZ})..."
 
-# Try to create subnet
-SUBNET_ID=$(aws ec2 create-subnet \
-    --vpc-id "$VPC_ID" \
-    --cidr-block "$SUBNET_CIDR" \
-    --availability-zone "$SUBNET_AZ" \
-    --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$SUBNET_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" \
-    --query 'Subnet.SubnetId' \
-    --output text 2>/dev/null)
+# Try to create subnet - use simpler command format
+SUBNET_ID=$(aws ec2 create-subnet --vpc-id "$VPC_ID" --cidr-block "$SUBNET_CIDR" --availability-zone "$SUBNET_AZ" --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$SUBNET_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" --query 'Subnet.SubnetId' --output text 2>/dev/null)
 
 # If creation failed, try to find existing
 if [[ -z "$SUBNET_ID" ]] || [[ "$SUBNET_ID" == "None" ]]; then
@@ -65,14 +59,8 @@ log_success "Subnet 1 created: $SUBNET_ID"
 # Create Subnet 2 (AZ-b) - Required for ALB
 log_info "[4/5] Creating Subnet 2 (${SUBNET2_CIDR} in ${SUBNET2_AZ})..."
 
-# Try to create subnet
-SUBNET2_ID=$(aws ec2 create-subnet \
-    --vpc-id "$VPC_ID" \
-    --cidr-block "$SUBNET2_CIDR" \
-    --availability-zone "$SUBNET2_AZ" \
-    --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$SUBNET2_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" \
-    --query 'Subnet.SubnetId' \
-    --output text 2>/dev/null)
+# Try to create subnet - use simpler command format
+SUBNET2_ID=$(aws ec2 create-subnet --vpc-id "$VPC_ID" --cidr-block "$SUBNET2_CIDR" --availability-zone "$SUBNET2_AZ" --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$SUBNET2_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" --query 'Subnet.SubnetId' --output text 2>/dev/null)
 
 # If creation failed, try to find existing
 if [[ -z "$SUBNET2_ID" ]] || [[ "$SUBNET2_ID" == "None" ]]; then
