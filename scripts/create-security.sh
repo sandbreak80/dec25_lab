@@ -59,6 +59,15 @@ done
 save_resource_id vm-sg "$VM_SG_ID" "$TEAM_NUMBER"
 log_success "VM Security Group: $VM_SG_ID"
 
+# Allow VM-to-VM communication (for Kubernetes cluster)
+log_info "Configuring VM-to-VM communication..."
+aws ec2 authorize-security-group-ingress \
+    --group-id "$VM_SG_ID" \
+    --protocol all \
+    --source-group "$VM_SG_ID" 2>/dev/null || log_info "VM-to-VM rule already exists"
+
+log_success "VM-to-VM communication enabled"
+
 # ALB Security Group
 log_info "[2/2] Creating ALB Security Group..."
 ALB_SG_ID=$(aws ec2 create-security-group \
