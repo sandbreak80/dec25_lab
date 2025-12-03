@@ -23,17 +23,26 @@ VM_SG_ID=$(aws ec2 create-security-group \
     --vpc-id "$VPC_ID" \
     --query 'GroupId' --output text 2>/dev/null || get_resource_id sg "$SG_NAME")
 
-# SSH from allowed CIDRs (Cisco VPN)
-log_info "Configuring SSH access from allowed CIDRs..."
+# SSH from allowed CIDRs (Cisco VPN public egress IPs)
+log_info "Configuring SSH access from Cisco VPN egress IPs..."
 for cidr in "${ALLOWED_SSH_CIDRS[@]}"; do
     # Determine description based on CIDR
     DESCRIPTION=""
     case "$cidr" in
-        "10.188.0.0/17")
-            DESCRIPTION="Cisco VPN US-West"
+        "151.186.183.24/32")
+            DESCRIPTION="Cisco VPN US-West egress 1"
             ;;
-        "10.189.0.0/18")
-            DESCRIPTION="Cisco VPN US-East"
+        "151.186.183.87/32")
+            DESCRIPTION="Cisco VPN US-West egress 2"
+            ;;
+        "151.186.182.23/32")
+            DESCRIPTION="Cisco VPN US-East egress 1"
+            ;;
+        "151.186.182.87/32")
+            DESCRIPTION="Cisco VPN US-East egress 2"
+            ;;
+        "151.186.192.0/20")
+            DESCRIPTION="Cisco VPN Shared pool"
             ;;
         *)
             DESCRIPTION="Team access"
