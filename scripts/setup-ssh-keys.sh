@@ -123,8 +123,15 @@ copy_key_to_vm() {
     
     log_info "[$VM_NUM/3] Copying SSH key to VM${VM_NUM}: $VM_IP"
     
-    # Use expect to handle password prompt with ssh-copy-id
-    expect << EOF_EXPECT 2>&1 | sed 's/^/    /'
+    # Wait for SSH to be ready (retry up to 3 times)
+    for attempt in 1 2 3; do
+        if [ $attempt -gt 1 ]; then
+            log_warning "Retry $attempt/3..."
+            sleep 5
+        fi
+        
+        # Use expect to handle password prompt with ssh-copy-id
+        expect << EOF_EXPECT 2>&1 | sed 's/^/    /'
 set timeout 30
 log_user 0
 
@@ -136,9 +143,11 @@ expect {
         expect {
             "added" {
                 puts "✅ SSH key copied successfully"
+                exit 0
             }
             "All keys were skipped" {
                 puts "✅ SSH key already present"
+                exit 0
             }
             timeout {
                 puts "❌ Timeout waiting for confirmation"
@@ -148,6 +157,7 @@ expect {
     }
     "All keys were skipped" {
         puts "✅ SSH key already present"
+        exit 0
     }
     timeout {
         puts "❌ Timeout waiting for password prompt"
@@ -157,13 +167,16 @@ expect {
 
 expect eof
 EOF_EXPECT
+        
+        if [ $? -eq 0 ]; then
+            log_success "VM${VM_NUM} SSH key installed!"
+            return 0
+        fi
+    done
     
-    if [ $? -eq 0 ]; then
-        log_success "VM${VM_NUM} SSH key installed!"
-    else
-        log_error "Failed to copy SSH key to VM${VM_NUM}"
-        exit 1
-    fi
+    log_error "Failed to copy SSH key to VM${VM_NUM} after 3 attempts"
+    exit 1
+    
     echo ""
 }
 

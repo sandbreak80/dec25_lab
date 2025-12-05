@@ -62,11 +62,16 @@ KEY_PATH=$(cat "state/team${TEAM_NUMBER}/ssh-key-path.txt" 2>/dev/null || echo "
 if [[ -n "$KEY_PATH" ]] && [[ -f "$KEY_PATH" ]]; then
     SSH_METHOD="key"
     log_info "Using SSH key: $KEY_PATH"
+    export KEY_PATH  # For expect scripts
 else
     SSH_METHOD="password"
     PASSWORD="AppDynamics123!"
     log_info "Using password-based SSH (password: $PASSWORD)"
 fi
+
+# Export password for expect scripts
+PASSWORD="AppDynamics123!"
+export PASSWORD
 
 log_info "Bootstrapping AppDynamics VMs for Team ${TEAM_NUMBER}..."
 echo ""
@@ -91,7 +96,22 @@ bootstrap_vm_with_key() {
     local VM_IP=$2
     local VM_PRIVATE=$3
     
+    # Export for expect
+    export VM_IP
+    
     log_info "[$VM_NUM/3] Bootstrapping VM${VM_NUM}: $VM_IP (using SSH key)"
+    
+    # Check if bootstrap already completed
+    if ssh -i "${KEY_PATH}" \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        -o ConnectTimeout=5 \
+        -o LogLevel=ERROR \
+        appduser@${VM_IP} "appdctl show boot | grep -q 'Succeeded'" 2>/dev/null; then
+        log_warning "VM${VM_NUM} already bootstrapped, skipping..."
+        echo ""
+        return 0
+    fi
     
     # Create bootstrap script
     cat > /tmp/bootstrap-vm${VM_NUM}.sh << 'BOOTSTRAP_EOF'
@@ -162,27 +182,30 @@ else
 fi
 BOOTSTRAP_EOF
 
-    # Copy and execute bootstrap script (using password auth)
-    # Use expect for password automation
-    expect << EOF_EXPECT
-set timeout 30
-spawn scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /tmp/bootstrap-vm${VM_NUM}.sh appduser@${VM_IP}:/tmp/bootstrap.sh
-expect {
-    "password:" { send "AppDynamics123!\r"; exp_continue }
-    eof
-}
-
-spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "chmod +x /tmp/bootstrap.sh && sudo /tmp/bootstrap.sh"
-expect {
-    "password:" { send "AppDynamics123!\r"; exp_continue }
-    eof
-}
-EOF_EXPECT
+    # Copy bootstrap script
+    scp -i "${KEY_PATH}" \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        -o LogLevel=ERROR \
+        /tmp/bootstrap-vm${VM_NUM}.sh appduser@${VM_IP}:/tmp/bootstrap.sh > /dev/null 2>&1
+    
+    # Execute bootstrap with password sent via stdin to sudo -S
+    ssh -i "${KEY_PATH}" \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        appduser@${VM_IP} "chmod +x /tmp/bootstrap.sh && echo '${PASSWORD}' | sudo -S /tmp/bootstrap.sh" 2>&1 | sed 's/^/  /'
+    
+    BOOTSTRAP_STATUS=${PIPESTATUS[0]}
     
     # Clean up
     rm -f /tmp/bootstrap-vm${VM_NUM}.sh
     
-    log_success "VM${VM_NUM} bootstrap complete!"
+    if [ $BOOTSTRAP_STATUS -eq 0 ]; then
+        log_success "VM${VM_NUM} bootstrap complete!"
+    else
+        log_error "VM${VM_NUM} bootstrap FAILED!"
+        exit 1
+    fi
     echo ""
 }
 
@@ -196,6 +219,98 @@ else
     bootstrap_vm_with_password 2 "$VM2_IP" "$VM2_PRIVATE"
     bootstrap_vm_with_password 3 "$VM3_IP" "$VM3_PRIVATE"
 fi
+
+# CRITICAL: Copy VM1's SSH key to VM2/VM3 for cluster init
+# appdctl cluster init needs VM1 to SSH to VM2/VM3
+log_info "Setting up VM-to-VM SSH for cluster init..."
+echo ""
+
+# Get VM1's public key (generated during bootstrap)
+log_info "Retrieving VM1's SSH public key..."
+if [[ "$SSH_METHOD" == "key" ]]; then
+    VM1_PUB_KEY=$(ssh -i "${KEY_PATH}" \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        -o LogLevel=ERROR \
+        appduser@${VM1_IP} "cat ~/.ssh/id_rsa.pub" 2>/dev/null)
+else
+    VM1_PUB_KEY=$(expect << EOF_EXPECT 2>/dev/null
+set timeout 10
+spawn ssh -o StrictHostKeyChecking=no appduser@${VM1_IP} "cat ~/.ssh/id_rsa.pub"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+)
+fi
+
+if [[ -z "$VM1_PUB_KEY" ]]; then
+    log_error "Failed to retrieve VM1's public key"
+    exit 1
+fi
+
+log_success "VM1 public key retrieved"
+
+# Function to safely add key to authorized_keys (idempotent)
+install_key_safely() {
+    local TARGET_IP=$1
+    local TARGET_NAME=$2
+    
+    log_info "Installing VM1's key on ${TARGET_NAME}..."
+    
+    if [[ "$SSH_METHOD" == "key" ]]; then
+        # Use a safe script that checks if key exists before adding
+        ssh -i "${KEY_PATH}" \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            appduser@${TARGET_IP} "
+                # Ensure .ssh directory exists with correct permissions
+                mkdir -p ~/.ssh
+                chmod 700 ~/.ssh
+                
+                # Check if key already exists
+                if grep -q \"${VM1_PUB_KEY}\" ~/.ssh/authorized_keys 2>/dev/null; then
+                    echo 'Key already present'
+                else
+                    # Add key safely
+                    echo '${VM1_PUB_KEY}' >> ~/.ssh/authorized_keys
+                    chmod 600 ~/.ssh/authorized_keys
+                    echo 'Key added'
+                fi
+            " 2>&1 | sed 's/^/    /'
+    else
+        expect << EOF_EXPECT 2>&1 | sed 's/^/    /'
+set timeout 10
+spawn ssh -o StrictHostKeyChecking=no appduser@${TARGET_IP} "
+    mkdir -p ~/.ssh
+    chmod 700 ~/.ssh
+    if grep -q \\\"${VM1_PUB_KEY}\\\" ~/.ssh/authorized_keys 2>/dev/null; then
+        echo 'Key already present'
+    else
+        echo '${VM1_PUB_KEY}' >> ~/.ssh/authorized_keys
+        chmod 600 ~/.ssh/authorized_keys
+        echo 'Key added'
+    fi
+"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+    fi
+    
+    log_success "${TARGET_NAME}: VM1 key installed"
+}
+
+# Install VM1's key on VM2 and VM3
+install_key_safely "$VM2_IP" "VM2"
+install_key_safely "$VM3_IP" "VM3"
+
+echo ""
+log_success "VM1 can now SSH to VM2/VM3 (required for cluster init)"
+echo ""
 
 # Final verification
 log_info "Running final verification on all VMs..."

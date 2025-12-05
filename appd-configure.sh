@@ -33,7 +33,6 @@ EOF
 TEAM_NUMBER=$(parse_team_number "$@")
 load_team_config "$TEAM_NUMBER"
 
-clear
 cat << EOF
 ╔══════════════════════════════════════════════════════════╗
 ║   Configure AppDynamics - Team ${TEAM_NUMBER}                      ║
@@ -48,13 +47,23 @@ EOF
 
 VM1_PUB=$(cat "state/team${TEAM_NUMBER}/vm1-public-ip.txt")
 
-read -p "Press ENTER to continue..."
+# Determine SSH method
+if [[ -f "state/team${TEAM_NUMBER}/ssh-key-path.txt" ]]; then
+    KEY_PATH=$(cat "state/team${TEAM_NUMBER}/ssh-key-path.txt")
+    SSH_OPTS="-i ${KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+    log_info "Using SSH key: $KEY_PATH"
+else
+    SSH_OPTS="-o StrictHostKeyChecking=no"
+    log_warning "No SSH key found, will prompt for password"
+fi
+
+echo ""
 
 # Step 1: Download current config
 log_info "Downloading current configuration from VM1..."
 mkdir -p "state/team${TEAM_NUMBER}/configs"
 
-scp appduser@$VM1_PUB:/var/appd/config/globals.yaml.gotmpl \
+scp $SSH_OPTS appduser@$VM1_PUB:/var/appd/config/globals.yaml.gotmpl \
     "state/team${TEAM_NUMBER}/configs/globals.yaml.gotmpl.original" || {
     log_error "Failed to download config. Is VM1 accessible?"
     exit 1
@@ -94,32 +103,28 @@ echo "DNS Names:"
 grep -A 6 "dnsNames:" "state/team${TEAM_NUMBER}/configs/globals.yaml.gotmpl.updated" | head -7
 echo ""
 
-read -p "Upload this configuration to VM1? (y/n) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    log_warning "Configuration not uploaded"
-    exit 1
-fi
+log_info "Uploading configuration to VM1..."
+echo ""
 
 # Step 4: Upload to VM1
 log_info "Uploading configuration to VM1..."
 
 # Backup original on VM1
-ssh appduser@$VM1_PUB "sudo cp /var/appd/config/globals.yaml.gotmpl /var/appd/config/globals.yaml.gotmpl.backup"
+ssh $SSH_OPTS appduser@$VM1_PUB "sudo cp /var/appd/config/globals.yaml.gotmpl /var/appd/config/globals.yaml.gotmpl.backup"
 
 # Upload new config
-scp "state/team${TEAM_NUMBER}/configs/globals.yaml.gotmpl.updated" \
+scp $SSH_OPTS "state/team${TEAM_NUMBER}/configs/globals.yaml.gotmpl.updated" \
     appduser@$VM1_PUB:/tmp/globals.yaml.gotmpl.new
 
 # Move into place
-ssh appduser@$VM1_PUB "sudo mv /tmp/globals.yaml.gotmpl.new /var/appd/config/globals.yaml.gotmpl"
-ssh appduser@$VM1_PUB "sudo chown appduser:appduser /var/appd/config/globals.yaml.gotmpl"
+ssh $SSH_OPTS appduser@$VM1_PUB "sudo mv /tmp/globals.yaml.gotmpl.new /var/appd/config/globals.yaml.gotmpl"
+ssh $SSH_OPTS appduser@$VM1_PUB "sudo chown appduser:appduser /var/appd/config/globals.yaml.gotmpl"
 
 log_success "Configuration uploaded"
 
 # Step 5: Verify
 log_info "Verifying configuration..."
-ssh appduser@$VM1_PUB "grep 'dnsDomain:' /var/appd/config/globals.yaml.gotmpl"
+ssh $SSH_OPTS appduser@$VM1_PUB "grep 'dnsDomain:' /var/appd/config/globals.yaml.gotmpl"
 
 cat << EOF
 

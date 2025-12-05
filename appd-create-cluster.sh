@@ -94,8 +94,106 @@ cat << EOF
 
 EOF
 
-# Step 1: Verify all nodes are ready
+# Step 1: Verify all nodes are bootstrapped
 log_info "Step 1: Verifying all nodes are bootstrapped..."
+echo ""
+
+# Function to check if a VM is fully bootstrapped
+check_bootstrap_complete() {
+    local VM_NUM=$1
+    local VM_IP=$2
+    
+    log_info "Checking VM${VM_NUM} bootstrap status..."
+    
+    if [[ "$SSH_METHOD" == "key" ]]; then
+        BOOT_STATUS=$(ssh ${SSH_OPTS} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 appduser@${VM1_PUB} "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 appduser@${VM_IP} 'appdctl show boot'" 2>/dev/null)
+    else
+        BOOT_STATUS=$(expect << EOF_EXPECT 2>/dev/null
+set timeout 15
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "ssh -o StrictHostKeyChecking=no appduser@${VM_IP} 'appdctl show boot'"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+)
+    fi
+    
+    # Check if all bootstrap steps show "Succeeded"
+    if echo "$BOOT_STATUS" | grep -q "STATUS" && ! echo "$BOOT_STATUS" | grep -E "(Failed|InProgress|Pending)" > /dev/null; then
+        log_success "VM${VM_NUM} bootstrap: Complete"
+        return 0
+    else
+        log_error "VM${VM_NUM} bootstrap: NOT COMPLETE"
+        echo "$BOOT_STATUS" | sed 's/^/    /'
+        return 1
+    fi
+}
+
+# Check all VMs are bootstrapped
+log_info "Verifying bootstrap completion on all VMs..."
+echo ""
+
+ALL_READY=true
+for i in 1 2 3; do
+    case $i in
+        1) VM_IP=$VM1_PRIV; VM_PUB_IP=$VM1_PUB ;;
+        2) VM_IP=$VM2_PRIV; VM_PUB_IP=$(cat "state/team${TEAM_NUMBER}/vm2-public-ip.txt") ;;
+        3) VM_IP=$VM3_PRIV; VM_PUB_IP=$(cat "state/team${TEAM_NUMBER}/vm3-public-ip.txt") ;;
+    esac
+    
+    # For VM1, check directly; for VM2/VM3, check via VM1
+    if [ $i -eq 1 ]; then
+        log_info "Checking VM1 bootstrap status (direct)..."
+        if [[ "$SSH_METHOD" == "key" ]]; then
+            BOOT_STATUS=$(ssh ${SSH_OPTS} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 appduser@${VM1_PUB} "appdctl show boot" 2>&1)
+        else
+            BOOT_STATUS=$(expect << 'EOF_EXPECT' 2>&1
+set timeout 15
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "appdctl show boot"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+)
+        fi
+        
+        if echo "$BOOT_STATUS" | grep -q "STATUS" && echo "$BOOT_STATUS" | grep -q "Succeeded" && ! echo "$BOOT_STATUS" | grep -E "(Failed|InProgress)" > /dev/null; then
+            log_success "VM1 bootstrap: Complete"
+        else
+            log_error "VM1 bootstrap: NOT COMPLETE (still running or failed)"
+            echo ""
+            echo "Current status:"
+            echo "$BOOT_STATUS" | sed 's/^/  /'
+            echo ""
+            log_warning "Bootstrap is still extracting container images (~15-20 min)"
+            log_warning "Run this command to monitor progress:"
+            echo "  ./scripts/ssh-vm1.sh --team ${TEAM_NUMBER}"
+            echo "  appdctl show boot"
+            echo ""
+            ALL_READY=false
+        fi
+    fi
+done
+
+if [ "$ALL_READY" = false ]; then
+    echo ""
+    log_error "Bootstrap not complete. Please wait and try again."
+    echo ""
+    echo "To monitor bootstrap progress:"
+    echo "  ./scripts/ssh-vm1.sh --team ${TEAM_NUMBER}"
+    echo "  watch -n 10 appdctl show boot"
+    echo ""
+    exit 1
+fi
+
+echo ""
+log_success "All VMs fully bootstrapped!"
+echo ""
+
+# Step 2: Verify network connectivity
+log_info "Step 2: Verifying network connectivity..."
 echo ""
 
 verify_node() {
@@ -138,8 +236,8 @@ echo ""
 log_success "All nodes are ready!"
 echo ""
 
-# Step 2: Add VM2/VM3 host keys to VM1's known_hosts
-log_info "Step 2: Adding VM2/VM3 host keys to VM1's known_hosts..."
+# Step 3: Add VM2/VM3 host keys to VM1's known_hosts
+log_info "Step 3: Adding VM2/VM3 host keys to VM1's known_hosts..."
 echo ""
 
 if [[ "$SSH_METHOD" == "key" ]]; then
@@ -159,8 +257,8 @@ fi
 log_success "Host keys added"
 echo ""
 
-# Step 3: Create cluster
-log_info "Step 3: Creating Kubernetes cluster..."
+# Step 4: Create cluster
+log_info "Step 4: Creating Kubernetes cluster..."
 echo ""
 log_info "Running: appdctl cluster init $VM2_PRIV $VM3_PRIV"
 echo ""
@@ -223,8 +321,8 @@ fi
 
 echo ""
 
-# Step 4: Verify cluster
-log_info "Step 4: Verifying cluster..."
+# Step 5: Verify cluster
+log_info "Step 5: Verifying cluster..."
 echo ""
 
 sleep 5

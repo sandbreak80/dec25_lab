@@ -59,7 +59,6 @@ fi
 
 load_team_config "$TEAM_NUMBER"
 
-clear
 cat << EOF
 ╔══════════════════════════════════════════════════════════╗
 ║   Install AppDynamics - Team ${TEAM_NUMBER}                        ║
@@ -82,87 +81,77 @@ EOF
 
 VM1_PUB=$(cat "state/team${TEAM_NUMBER}/vm1-public-ip.txt")
 
-read -p "Press ENTER to start installation..."
+# Determine SSH method
+if [[ -f "state/team${TEAM_NUMBER}/ssh-key-path.txt" ]]; then
+    KEY_PATH=$(cat "state/team${TEAM_NUMBER}/ssh-key-path.txt")
+    SSH_OPTS="-i ${KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
+    log_info "Using SSH key: $KEY_PATH"
+else
+    SSH_OPTS="-o StrictHostKeyChecking=no"
+    log_warning "No SSH key found, using password authentication"
+fi
 
-cat << EOF
-
-╔══════════════════════════════════════════════════════════╗
-║   Installation Instructions                              ║
-╚══════════════════════════════════════════════════════════╝
-
-Step 1: SSH to VM1
-  ssh appduser@$VM1_PUB
-
-Step 2: Verify cluster is healthy
-  appdctl show cluster
-  # All nodes should show "Running: true"
-
-Step 3: Start installation
-  appdcli start all $PROFILE
-
-  This installs everything in one command!
-
-Step 4: Monitor installation (20-30 minutes)
-  
-  Watch pods starting:
-    watch kubectl get pods --all-namespaces
-
-  Check service status:
-    appdcli ping
-
-  View resource usage:
-    kubectl top nodes
-
-Step 5: Wait for all services to show "Success"
-  appdcli ping
-  
-  Expected output:
-    Controller          | Success
-    Events              | Success
-    EUM Collector       | Success
-    EUM Aggregator      | Success
-    EUM Screenshot      | Success
-    Synthetic Shepherd  | Success
-    Synthetic Scheduler | Success
-    Synthetic Feeder    | Success
-    AD/RCA Services     | Success
-    SecureApp           | Success
-    ATD                 | Success
-
-Step 6: Exit SSH
-  exit
-
-╔══════════════════════════════════════════════════════════╗
-║   Common Issues & Solutions                              ║
-╚══════════════════════════════════════════════════════════╝
-
-Issue: "Permission denied on secrets.yaml"
-Fix:   sudo chmod 644 /var/appd/config/secrets.yaml
-
-Issue: "Database is locked" (MySQL)
-Fix:   Wait 30 seconds and retry: appdcli start all $PROFILE
-
-Issue: "Pod stuck in Pending"
-Fix:   Check resources: kubectl top nodes
-       May need to wait for other pods to stabilize
-
-Issue: Service shows "Failed"
-Fix:   Wait 5 more minutes - some services take time
-       Check pod logs: kubectl logs <pod-name> -n <namespace>
-
-EOF
-
-read -p "Press ENTER when installation is complete..."
-
-# Verify installation
 echo ""
-log_info "Verifying installation..."
+log_info "Starting AppDynamics installation on VM1..."
+echo ""
 
-ssh -o ConnectTimeout=10 appduser@$VM1_PUB "appdcli ping" 2>/dev/null | tee "state/team${TEAM_NUMBER}/service-status.txt" && {
-    log_success "Services verified!"
-} || {
-    log_warning "Could not verify services - check manually"
-}
+# Step 1: Verify cluster health
+log_info "Step 1: Verifying cluster health..."
+ssh $SSH_OPTS appduser@$VM1_PUB "appdctl show cluster" 2>&1 | tee "state/team${TEAM_NUMBER}/cluster-status.txt"
+if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    log_error "Cluster check failed"
+    exit 1
+fi
+log_success "Cluster is healthy"
+echo ""
+
+# Step 2: Start installation
+log_info "Step 2: Starting AppDynamics installation..."
+log_warning "This will take 20-30 minutes. Please be patient..."
+echo ""
+
+ssh $SSH_OPTS appduser@$VM1_PUB "appdcli start all $PROFILE" 2>&1 | sed 's/^/  /'
+
+if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    log_error "Installation command failed"
+    log_info "You can manually complete the installation:"
+    log_info "  ./scripts/ssh-vm1.sh --team $TEAM_NUMBER"
+    log_info "  appdcli start all $PROFILE"
+    exit 1
+fi
+
+log_success "Installation command completed"
+echo ""
+
+# Step 3: Wait and verify
+log_info "Step 3: Waiting for services to start (checking every 60 seconds)..."
+echo ""
+
+for i in {1..30}; do
+    sleep 60
+    echo "  Check $i/30..."
+    ssh $SSH_OPTS appduser@$VM1_PUB "appdcli ping" 2>&1 | tee "state/team${TEAM_NUMBER}/service-status-check.txt"
+    
+    # Check if all services are up
+    if grep -q "Success" "state/team${TEAM_NUMBER}/service-status-check.txt" && \
+       ! grep -q "Progressing\|Failed\|Pending" "state/team${TEAM_NUMBER}/service-status-check.txt"; then
+        log_success "All services are up!"
+        break
+    fi
+    
+    if [ $i -eq 30 ]; then
+        log_warning "Timeout waiting for services. Check manually:"
+        log_info "  ./scripts/ssh-vm1.sh --team $TEAM_NUMBER"
+        log_info "  appdcli ping"
+    fi
+done
+
+echo ""
+echo ""
+log_info "Final verification..."
+
+ssh $SSH_OPTS appduser@$VM1_PUB "appdcli ping" 2>&1 | tee "state/team${TEAM_NUMBER}/service-status.txt"
+log_success "Services verified!"
 
 cat << EOF
 
@@ -189,10 +178,6 @@ cat << EOF
   3. Apply license (when received)
   4. Configure applications
   5. Deploy agents
-
-🔒 Optional: Install SecureApp separately
-  (Note: 'start all' already includes SecureApp)
-  ./appd-install-secureapp.sh --team ${TEAM_NUMBER}
 
 🔍 Troubleshooting:
   ./appd-check-health.sh --team ${TEAM_NUMBER}
