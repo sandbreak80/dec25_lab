@@ -1,0 +1,54 @@
+Clean up project - remove duplicate instructions and sync docs with deployment
+
+## Documentation Updates
+- ✅ Rewrote START_HERE.md - clear 8-step deployment guide matching Team 2 build
+- ✅ Rewrote LAB_GUIDE.md - comprehensive guide with all phases and troubleshooting
+- ✅ Rewrote QUICK_REFERENCE.md - command reference for quick access
+- ✅ Deleted TEAM2_BUILD.md - duplicate content, now in main docs
+- ✅ All docs now use Team 1 as example (generic, not Team 2 specific)
+- ✅ Consistent workflow across all documentation
+
+## Script Output Cleanup
+- ✅ Removed "Next Steps" from lab-deploy.sh (duplicated docs)
+- ✅ Removed "Next Steps" from appd-change-password.sh
+- ✅ Removed "Next Steps" from appd-bootstrap-vms.sh
+- ✅ Removed "Next Steps" from appd-create-cluster.sh
+- ✅ Removed "Next Steps" from appd-configure.sh
+- ✅ Removed "Next Steps" from appd-install.sh
+- ✅ Removed "Next Steps" from appd-install-secureapp.sh
+
+**Rationale:** Scripts should execute cleanly without repeating what's 
+already documented. Students follow docs (START_HERE.md or LAB_GUIDE.md), 
+not script output. This reduces cognitive load and prevents confusion.
+
+## Project Organization
+- ✅ Removed Team 2 specific documentation (TEAM2_BUILD.md)
+- ✅ State files remain for Team 2 (actual deployment)
+- ✅ Lab/ directory contains legacy/development history (preserved)
+- ✅ Root-level scripts are production scripts
+- ✅ Root-level docs are student-facing
+
+## Documentation Consistency
+All docs now follow this workflow (matching actual Team 2 deployment):
+1. Deploy infrastructure (lab-deploy.sh)
+2. Change password (appd-change-password.sh)
+3. Setup SSH keys (scripts/setup-ssh-keys.sh) - RECOMMENDED
+4. Bootstrap VMs (appd-bootstrap-vms.sh) + WAIT 15-20 min
+5. Create cluster (appd-create-cluster.sh)
+6. Configure (appd-configure.sh)
+7. Install (appd-install.sh)
+8. Verify (appd-check-health.sh)
+
+## User Experience Improvements
+- ✅ Single source of truth: START_HERE.md for quick start
+- ✅ Detailed reference: LAB_GUIDE.md for comprehensive guide
+- ✅ Quick commands: QUICK_REFERENCE.md for copy/paste
+- ✅ No duplicate instructions between scripts and docs
+- ✅ Cleaner script output focuses on status, not instructions
+- ✅ All examples use Team 1 (generic) not Team 2 (specific)
+
+Students now have:
+- Clear entry point (START_HERE.md)
+- Detailed guidance when needed (LAB_GUIDE.md)
+- Quick reference for common tasks (QUICK_REFERENCE.md)
+- Clean script output without clutter

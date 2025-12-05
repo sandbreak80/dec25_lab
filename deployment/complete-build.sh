@@ -5,7 +5,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/lib/common.sh"
+source "${SCRIPT_DIR}/../lib/common.sh"
 
 show_usage() {
     cat << EOF
@@ -77,19 +77,19 @@ sleep 5
 # Step 1: Infrastructure
 log_info "=== STEP 1/7: Deploying Infrastructure ==="
 echo ""
-./scripts/create-network.sh --team "$TEAM_NUMBER"
-./scripts/create-security.sh --team "$TEAM_NUMBER"
-./scripts/create-vms.sh --team "$TEAM_NUMBER"
-./scripts/create-alb.sh --team "$TEAM_NUMBER"
+../scripts/create-network.sh --team "$TEAM_NUMBER"
+../scripts/create-security.sh --team "$TEAM_NUMBER"
+../scripts/create-vms.sh --team "$TEAM_NUMBER"
+../scripts/create-alb.sh --team "$TEAM_NUMBER"
 
 # Fix ALB DNS for DNS script
 ALB_DNS=$(aws elbv2 describe-load-balancers \
     --names "appd-team${TEAM_NUMBER}-alb" \
     --query 'LoadBalancers[0].DNSName' \
     --output text 2>/dev/null)
-echo "$ALB_DNS" > "state/team${TEAM_NUMBER}/alb-dns.txt"
+echo "$ALB_DNS" > "../state/team${TEAM_NUMBER}/alb-dns.txt"
 
-./scripts/create-dns.sh --team "$TEAM_NUMBER"
+../scripts/create-dns.sh --team "$TEAM_NUMBER"
 
 log_success "Infrastructure deployed!"
 echo ""
@@ -97,23 +97,21 @@ echo ""
 # Step 2: Change Password
 log_info "=== STEP 2/7: Changing Password ==="
 echo ""
-./appd-change-password.sh --team "$TEAM_NUMBER"
+./02-change-password.sh --team "$TEAM_NUMBER"
 log_success "Password changed!"
 echo ""
 
 # Step 3: Setup SSH Keys
 log_info "=== STEP 3/7: Setting up SSH Keys ==="
 echo ""
-# Delete old keys if they exist
-rm -f "/Users/bmstoner/.ssh/appd-team${TEAM_NUMBER}-key"*
-./scripts/setup-ssh-keys.sh --team "$TEAM_NUMBER"
+./03-setup-ssh-keys.sh --team "$TEAM_NUMBER"
 log_success "SSH keys configured!"
 echo ""
 
 # Step 4: Bootstrap VMs
 log_info "=== STEP 4/7: Bootstrapping VMs ==="
 echo ""
-./appd-bootstrap-vms.sh --team "$TEAM_NUMBER"
+./04-bootstrap-vms.sh --team "$TEAM_NUMBER"
 log_success "Bootstrap initiated!"
 echo ""
 
@@ -140,7 +138,7 @@ fi
 # Step 6: Create Cluster
 log_info "=== STEP 6/7: Creating Kubernetes Cluster ==="
 echo ""
-./appd-create-cluster.sh --team "$TEAM_NUMBER"
+./05-create-cluster.sh --team "$TEAM_NUMBER"
 log_success "Cluster created!"
 echo ""
 
@@ -164,13 +162,13 @@ Team ${TEAM_NUMBER} is fully deployed and ready!
 
 📝 Next Steps:
    1. Configure cluster:
-      ./appd-configure.sh --team ${TEAM_NUMBER}
+      ./06-configure.sh --team ${TEAM_NUMBER}
    
    2. Install AppDynamics:
-      ./appd-install.sh --team ${TEAM_NUMBER}
+      ./07-install.sh --team ${TEAM_NUMBER}
 
 🔍 Check Status:
-   ./scripts/check-status.sh --team ${TEAM_NUMBER}
+   ../scripts/check-status.sh --team ${TEAM_NUMBER}
 
 Happy Learning! 🎓
 

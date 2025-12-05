@@ -23,7 +23,7 @@ Welcome! This guide will walk you through deploying your AppDynamics lab environ
 Deploy your team's AWS resources (VPC, VMs, Load Balancer, DNS):
 
 ```bash
-./lab-deploy.sh --team 1
+./deployment/01-deploy.sh --team 1
 # Replace "1" with your team number
 ```
 
@@ -40,7 +40,7 @@ Deploy your team's AWS resources (VPC, VMs, Load Balancer, DNS):
 Change the default `appduser` password:
 
 ```bash
-./appd-change-password.sh --team 1
+./deployment/02-change-password.sh --team 1
 ```
 
 **Default password:** `changeme`  
@@ -53,7 +53,7 @@ Change the default `appduser` password:
 Setup passwordless SSH access (saves typing password 30+ times!):
 
 ```bash
-./scripts/setup-ssh-keys.sh --team 1
+./deployment/03-setup-ssh.sh --team 1
 ```
 
 After this completes, you can SSH without entering password:
@@ -68,7 +68,7 @@ After this completes, you can SSH without entering password:
 Initialize all 3 VMs with `appdctl host init`:
 
 ```bash
-./appd-bootstrap-vms.sh --team 1
+./deployment/04-bootstrap-vms.sh --team 1
 ```
 
 **IMPORTANT:** After this completes, the VMs will extract a large image file (~15-20 minutes). **Do not proceed until this finishes!**
@@ -88,7 +88,7 @@ exit
 Create the 3-node Kubernetes cluster:
 
 ```bash
-./appd-create-cluster.sh --team 1
+./deployment/05-create-cluster.sh --team 1
 ```
 
 This will create a highly-available MicroK8s cluster across all 3 VMs.
@@ -100,7 +100,7 @@ This will create a highly-available MicroK8s cluster across all 3 VMs.
 Update the AppDynamics configuration with your team's DNS settings:
 
 ```bash
-./appd-configure.sh --team 1
+./deployment/06-configure.sh --team 1
 ```
 
 ---
@@ -110,7 +110,7 @@ Update the AppDynamics configuration with your team's DNS settings:
 Install all AppDynamics services:
 
 ```bash
-./appd-install.sh --team 1
+./deployment/07-install.sh --team 1
 ```
 
 The script will automatically monitor installation progress. This takes 20-30 minutes.
@@ -122,7 +122,7 @@ The script will automatically monitor installation progress. This takes 20-30 mi
 Check that all services are running:
 
 ```bash
-./appd-check-health.sh --team 1
+./deployment/08-verify.sh --team 1
 ```
 
 **Access your Controller:**
@@ -139,7 +139,7 @@ Check that all services are running:
 When you're done with the lab, delete all resources:
 
 ```bash
-./lab-cleanup.sh --team 1 --confirm
+./deployment/cleanup.sh --team 1 --confirm
 # You'll be prompted to type: DELETE TEAM 1
 ```
 
@@ -147,10 +147,10 @@ When you're done with the lab, delete all resources:
 
 ## 📚 Additional Documentation
 
-- **LAB_GUIDE.md** - Detailed lab instructions
-- **QUICK_REFERENCE.md** - Common commands reference
+- **docs/LAB_GUIDE.md** - Detailed lab instructions
+- **docs/QUICK_REFERENCE.md** - Common commands reference
 - **README.md** - Project documentation
-- **FIX-REQUIRED.md** - Known issues and workarounds
+- **docs/FIX-REQUIRED.md** - Known issues and workarounds
 
 ---
 

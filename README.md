@@ -195,33 +195,37 @@ Before running `./lab-deploy.sh`, verify:
 Deploy a complete AppDynamics lab environment in ~40 minutes:
 
 ```bash
-# 1. Configure AWS credentials
-export AWS_PROFILE=default
-export AWS_REGION=us-west-2
+# 1. Verify prerequisites
+./scripts/check-prerequisites.sh
 
-# 2. Edit team configuration
-vi config/team1.cfg
+# 2. Deploy infrastructure (10 minutes)
+./deployment/01-deploy.sh --team 1
 
-# 3. Deploy infrastructure (10 minutes)
-./lab-deploy.sh --team 1
+# 3. Change password (1 minute)
+./deployment/02-change-password.sh --team 1
 
-# 4. Change password (1 minute)
-./appd-change-password.sh --team 1
+# 4. Setup SSH keys (1 minute) - RECOMMENDED
+./deployment/03-setup-ssh-keys.sh --team 1
 
-# 5. Setup SSH keys (1 minute)
-./scripts/setup-ssh-keys.sh --team 1
+# 5. Bootstrap VMs (5 minutes + 15-20 min wait)
+./deployment/04-bootstrap-vms.sh --team 1
 
-# 6. Bootstrap VMs (5 minutes)
-./appd-bootstrap-vms.sh --team 1
+# 6. Create cluster (10 minutes)
+./deployment/05-create-cluster.sh --team 1
 
-# 7. Create cluster (10 minutes)
-./appd-create-cluster.sh --team 1
+# 7. Configure AppD (1 minute)
+./deployment/06-configure.sh --team 1
 
-# 8. Configure AppD (1 minute)
-./appd-configure.sh --team 1
+# 8. Install AppDynamics (20-30 minutes)
+./deployment/07-install.sh --team 1
 
-# 9. Install AppDynamics (20-30 minutes)
-./appd-install.sh --team 1
+# 9. Verify deployment
+./deployment/08-verify.sh --team 1
+```
+
+**Or use the complete build script:**
+```bash
+./deployment/complete-build.sh --team 1
 ```
 
 ## 📊 What Gets Deployed
@@ -268,8 +272,39 @@ Each team gets a complete, isolated environment:
 
 ```
 appd-virtual-appliance/deploy/aws/
-├── README.md                    # This file
-├── FIX-REQUIRED.md             # Known issues and workarounds
+├── README.md                    # Project overview  
+├── START_HERE.md                # Quick start guide
+│
+├── deployment/                  # Deployment workflow scripts
+│   ├── 01-deploy.sh             # Deploy infrastructure
+│   ├── 02-change-password.sh    # Change VM password
+│   ├── 03-setup-ssh-keys.sh     # Setup SSH keys
+│   ├── 04-bootstrap-vms.sh      # Initialize VMs
+│   ├── 05-create-cluster.sh     # Create K8s cluster
+│   ├── 06-configure.sh          # Configure AppD
+│   ├── 07-install.sh            # Install services
+│   ├── 08-verify.sh             # Verify deployment
+│   ├── cleanup.sh               # Delete all resources
+│   └── complete-build.sh        # End-to-end automation
+│
+├── scripts/                     # Infrastructure automation
+│   ├── create-network.sh        # VPC, subnets, IGW
+│   ├── create-security.sh       # Security groups
+│   ├── create-vms.sh            # EC2 instances
+│   ├── create-alb.sh            # Load balancer
+│   ├── create-dns.sh            # Route 53 records
+│   ├── check-prerequisites.sh   # Verify requirements
+│   ├── ssh-vm1.sh               # Quick SSH to VM1
+│   ├── ssh-vm2.sh               # Quick SSH to VM2
+│   └── ssh-vm3.sh               # Quick SSH to VM3
+│
+├── docs/                        # Documentation
+│   ├── LAB_GUIDE.md             # Detailed lab guide
+│   ├── QUICK_REFERENCE.md       # Command reference
+│   ├── IAM_REQUIREMENTS.md      # IAM permissions
+│   ├── PROJECT_STATUS.md        # Project status
+│   ├── FIX-REQUIRED.md          # Known issues
+│   └── instructor/              # Instructor resources
 │
 ├── config/                      # Team configurations
 │   ├── team1.cfg
@@ -278,37 +313,16 @@ appd-virtual-appliance/deploy/aws/
 │   ├── team4.cfg
 │   └── team5.cfg
 │
-├── scripts/                     # Infrastructure scripts
-│   ├── create-network.sh       # VPC, subnets, IGW
-│   ├── create-security.sh      # Security groups
-│   ├── create-vms.sh           # EC2 instances
-│   ├── create-alb.sh           # Load balancer
-│   ├── create-dns.sh           # Route 53 records
-│   ├── setup-ssh-keys.sh       # SSH key automation
-│   ├── ssh-vm1.sh              # Quick SSH to VM1
-│   ├── ssh-vm2.sh              # Quick SSH to VM2
-│   └── ssh-vm3.sh              # Quick SSH to VM3
-│
-├── appd-*.sh                    # AppDynamics automation
-│   ├── appd-change-password.sh # Change appduser password
-│   ├── appd-bootstrap-vms.sh   # Initialize VMs
-│   ├── appd-create-cluster.sh  # Create K8s cluster
-│   ├── appd-configure.sh       # Update globals.yaml
-│   └── appd-install.sh         # Install AppD services
-│
-├── lab-*.sh                     # Lab management
-│   ├── lab-deploy.sh           # Deploy infrastructure
-│   ├── lab-cleanup.sh          # Delete everything
-│   └── complete-build.sh       # Full automation (NEW!)
-│
 ├── lib/                         # Shared libraries
-│   └── common.sh               # Common functions
+│   └── common.sh                # Common functions
+│
+├── archive/                     # Legacy content
+│   └── vendor-scripts/          # Original vendor scripts
 │
 ├── state/                       # Deployment state (gitignored)
 │   └── teamN/
 │       ├── vpc-id.txt
 │       ├── vm-summary.txt
-│       ├── urls.txt
 │       └── ...
 │
 └── logs/                        # Deployment logs (gitignored)
@@ -545,7 +559,10 @@ kubectl logs <pod-name> -n <namespace>
 
 ## 📚 Documentation
 
-- **[FIX-REQUIRED.md](FIX-REQUIRED.md)** - Lab automation enhancement notes
+- **[docs/LAB_GUIDE.md](docs/LAB_GUIDE.md)** - Comprehensive lab guide
+- **[docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Command reference
+- **[docs/IAM_REQUIREMENTS.md](docs/IAM_REQUIREMENTS.md)** - IAM permissions for students
+- **[docs/FIX-REQUIRED.md](docs/FIX-REQUIRED.md)** - Lab automation enhancement notes
 - **Official Docs:** [AppDynamics VA Installation Guide](https://docs.appdynamics.com/)
 
 ## 🔐 Security Notes
