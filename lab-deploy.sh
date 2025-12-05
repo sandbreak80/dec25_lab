@@ -238,49 +238,7 @@ cat << EOF
    Controller: https://controller-team${TEAM_NUMBER}.splunkylabs.com/controller/
    Auth:       https://customer1-team${TEAM_NUMBER}.auth.splunkylabs.com/
 
-📝 Next Steps:
-   1. Change appduser password (REQUIRED!):
-      ./appd-change-password.sh --team ${TEAM_NUMBER}
-      Default: changeme → AppDynamics123!
-   
-   2. Setup SSH keys (HIGHLY RECOMMENDED - saves 30-50 password entries!):
-      ./scripts/setup-ssh-keys.sh --team ${TEAM_NUMBER}
-      Time: 1 minute | Benefit: Passwordless SSH! 🎉
-   
-   3. Bootstrap VMs (wait for image extraction ~15 min):
-      ./appd-bootstrap-vms.sh --team ${TEAM_NUMBER}
-      (Passwordless if you setup keys in step 2!)
-   
-   4. Verify bootstrap complete (after 15-20 min wait):
-      ./scripts/ssh-vm1.sh --team ${TEAM_NUMBER}
-      appdctl show boot  # All should show "Succeeded"
-   
-   5. Create cluster:
-      ./appd-create-cluster.sh --team ${TEAM_NUMBER}
-   
-   6. Configure cluster:
-      ./appd-configure.sh --team ${TEAM_NUMBER}
-   
-   7. Install AppDynamics:
-      ./appd-install.sh --team ${TEAM_NUMBER}
-      
-   8. Access web UI:
-      https://controller-team${TEAM_NUMBER}.splunkylabs.com/controller/
-      Username: admin / Password: welcome
-      
-SSH Info:
-   User: appduser
-   Initial password: changeme
-   Team password: AppDynamics123! (after step 1)
-   SSH keys: Optional but HIGHLY recommended! (step 2)
-
-📚 Documentation:
-   Quick Start:  ./START_HERE.md
-   Lab Guide:    ./LAB_GUIDE.md
-   Full Build:   ./TEAM2_BUILD.md (Team 2 example)
-
-🔍 Check Status:
-   ./scripts/check-status.sh --team ${TEAM_NUMBER}
+📚 Next: See START_HERE.md or LAB_GUIDE.md for deployment steps
 
 📋 Log File:
    ${LOG_FILE}

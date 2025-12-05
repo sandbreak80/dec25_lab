@@ -137,9 +137,6 @@ Configuration files:
   Local backup:    state/team${TEAM_NUMBER}/configs/globals.yaml.gotmpl.original
   Updated config:  Applied to VM1
 
-📝 Next Step: Install AppDynamics
-  ./appd-install.sh --team ${TEAM_NUMBER}
-
 EOF
 
 mark_step_complete "appd-configured" "$TEAM_NUMBER"

@@ -1,364 +1,432 @@
-# AppDynamics Virtual Appliance - Multi-Team AWS Lab
+# AppDynamics Virtual Appliance - AWS Lab Guide
 
-**Quick Start for Students** | **5-Team Lab Environment** | **Complete Deployment Automation**
+**Complete deployment guide for multi-team AppDynamics labs.**
 
 ---
 
 ## 🎯 Lab Overview
 
-Deploy your own isolated AppDynamics cluster in AWS! Each team builds:
+Deploy a complete AppDynamics cluster in AWS with:
 - ✅ 3 EC2 instances (AppDynamics Virtual Appliance)
-- ✅ Application Load Balancer with SSL certificate
+- ✅ Application Load Balancer with SSL
 - ✅ DNS records (Route 53)
-- ✅ Complete AppDynamics installation (Controller, EUM, Events, AIOps, SecureApp)
+- ✅ Full AppDynamics installation (Controller, EUM, Events, AIOps, SecureApp)
 
-**Time:** 90-120 minutes | **Difficulty:** Intermediate | **Teams:** 5 (4 students each)
+**Time:** 60-90 minutes | **Teams:** 1-5 (isolated environments)
 
 ---
 
 ## 📋 Prerequisites
 
-Before starting, ensure you have:
-- [ ] AWS account access (credentials from instructor)
-- [ ] Cisco VPN connection (required for SSH)
-- [ ] AWS CLI installed and configured
-- [ ] Git installed
-- [ ] Terminal/command line access
+### Required
+- [ ] AWS account with configured credentials
+- [ ] Cisco VPN connection
+- [ ] AWS CLI v2 installed
+- [ ] Team assignment (1-5)
+
+### Verify Prerequisites
+```bash
+./scripts/check-prerequisites.sh
+```
+
+This checks:
+- AWS CLI v2 installation
+- AWS credentials
+- Cisco VPN connection
+- Required tools (`expect`, `jq`, `ssh`)
 
 ---
 
-## 🚀 Lab Steps
+## 🚀 Phase 1: Infrastructure Deployment
 
-### Phase 1: Initial Setup (5 minutes)
+### Step 1: Deploy Infrastructure (~10 minutes)
 
-1. **Clone the repository:**
-   ```bash
-   git clone <repo-url>
-   cd appd-virtual-appliance/deploy/aws
-   ```
-
-2. **Verify your team assignment:**
-   - You'll be assigned Team 1-5
-   - Your team config: `config/team1.cfg` (example)
-
-3. **Connect to Cisco VPN:**
-   ```bash
-   # Verify VPN connection
-   curl ifconfig.me
-   # Should show: 151.186.* (Cisco VPN IP)
-   ```
-
-4. **Configure AWS credentials:**
-   ```bash
-   aws configure
-   # Enter credentials provided by instructor
-   
-   # Test access
-   aws sts get-caller-identity
-   ```
-
----
-
-### Phase 2: Deploy Infrastructure (10 minutes)
-
-Deploy your team's AWS infrastructure:
+Deploy VPC, VMs, Load Balancer, and DNS:
 
 ```bash
-# Deploy Team 1 (adjust team number for your team)
-./lab-deploy.sh config/team1.cfg
+./lab-deploy.sh --team 1
 ```
 
 **What gets created:**
-- VPC with public subnet
-- 3 EC2 instances (m5a.4xlarge, 16 vCPUs, 64GB RAM each)
-- Application Load Balancer
-- SSL certificate (AWS ACM)
-- DNS records
+- VPC with 2 subnets (different AZs)
+- 3× m5a.4xlarge instances (16 vCPU, 64GB RAM each)
+  - 200GB OS disk per VM
+  - 500GB data disk per VM
+- Application Load Balancer with ACM SSL certificate
+- Route 53 DNS records:
+  - `controller-team1.splunkylabs.com`
+  - `customer1-team1.auth.splunkylabs.com`
+- Security groups:
+  - SSH: Restricted to Cisco VPN IPs only
+  - HTTPS: Open to all (0.0.0.0/0)
 
-**Expected output:**
+**Deployment completes when you see:**
 ```
-✅ Deployment Complete!
-
-Your Team 1 Infrastructure:
-  VPC: vpc-XXXXXXXXX (10.1.0.0/16)
-  VM1: 52.x.x.x (Primary - use this for cluster commands)
-  VM2: 54.x.x.x
-  VM3: 35.x.x.x
-  
-  ALB: team1-alb-XXXXXXXX.us-west-2.elb.amazonaws.com
-  
-  URLs:
-    Controller: https://controller-team1.splunkylabs.com/controller/
-    Auth: https://team1.auth.splunkylabs.com
-    
-Time: ~10 minutes
+✅ DEPLOYMENT COMPLETE!
+Your URLs:
+  Controller: https://controller-team1.splunkylabs.com/controller/
 ```
 
 ---
 
-### Phase 3: Bootstrap VMs (5 minutes)
+## 🔐 Phase 2: VM Preparation
 
-Initialize each VM with network and storage settings:
+### Step 2: Change Password (~1 minute)
+
+Change the default `appduser` password on all VMs:
 
 ```bash
-./appd-bootstrap-vms.sh config/team1.cfg
+./appd-change-password.sh --team 1
 ```
 
-This will:
-- SSH to each VM
-- Configure hostname, IP, gateway, DNS
-- Setup storage
-- Initialize MicroK8s
-- Verify bootstrap completed
+**Changes:**
+- `changeme` → `AppDynamics123!`
 
-**Expected output:**
-```
-✅ All VMs bootstrapped successfully!
-
-Run 'appdctl show boot' on each VM to verify.
+You can customize the password:
+```bash
+./appd-change-password.sh --team 1 --password "YourPassword"
 ```
 
 ---
 
-### Phase 4: Create AppDynamics Cluster (5 minutes)
+### Step 3: Setup SSH Keys (~1 minute) **HIGHLY RECOMMENDED**
 
-Create a 3-node MicroK8s cluster:
+Avoid typing password 30-50 times during deployment!
 
 ```bash
-./appd-create-cluster.sh config/team1.cfg
+./scripts/setup-ssh-keys.sh --team 1
 ```
 
-This will:
-- Initialize cluster on VM1
-- Join VM2 and VM3 to cluster
-- Verify all nodes are ready
-- Label nodes for AppDynamics
+**What this does:**
+- Generates ED25519 SSH key pair: `~/.ssh/appd-team1-key`
+- Copies public key to all 3 VMs
+- Enables passwordless SSH
 
-**Expected output:**
+**Test passwordless access:**
+```bash
+./scripts/ssh-vm1.sh --team 1
+# You should connect without password prompt!
+exit
 ```
-✅ Cluster created successfully!
 
-NODE           ROLE    RUNNING
-10.1.0.103     voter   true
-10.1.0.56      voter   true
-10.1.0.177     voter   true
-```
+**Skip this step?** You'll need to enter `AppDynamics123!` password many times during subsequent steps.
 
 ---
 
-### Phase 5: Configure AppDynamics (3 minutes)
+## 🏗 Phase 3: Cluster Creation
 
-Configure AppDynamics settings (domain, DNS, passwords):
+### Step 4: Bootstrap VMs (~5 minutes + 15-20 minute wait)
+
+Initialize all VMs with `appdctl host init`:
 
 ```bash
-./appd-configure.sh config/team1.cfg
+./appd-bootstrap-vms.sh --team 1
 ```
 
-This will:
-- Update `globals.yaml.gotmpl` with your team's domain
-- Set DNS names
-- Configure external URLs
-- Verify DNS resolution
+**What happens:**
+1. Connects to each VM via SSH
+2. Runs `sudo appdctl host init` on each
+3. Configures:
+   - Storage (LVM for data disk)
+   - Networking
+   - MicroK8s installation
+   - Firewall rules
+   - SSH keys for VM-to-VM communication
+4. **Starts image extraction** (~15-20 minutes, runs in background)
 
-**Expected output:**
+**CRITICAL:** After script completes, **WAIT 15-20 MINUTES** for image extraction to finish before proceeding!
+
+**Verify bootstrap completion:**
+```bash
+./scripts/ssh-vm1.sh --team 1
+appdctl show boot
 ```
-✅ Configuration updated!
 
-DNS Domain: splunkylabs.com
-DNS Names:
-  - controller-team1.splunkylabs.com
-  - team1.auth.splunkylabs.com
-  - team1-tnt-authn.splunkylabs.com
+Expected output (all tasks "Succeeded"):
+```
+TASK                        | STATUS    | MESSAGE
+----------------------------|-----------|------------------
+lvm                         | Succeeded |
+host-properties             | Succeeded |
+microk8s-setup              | Succeeded |
+firewall-ports              | Succeeded |
+load-images                 | Succeeded | ← Must be "Succeeded"
+certificates                | Succeeded |
+appdynamics-operator        | Succeeded |
+```
+
+**If `load-images` shows "In Progress":** Wait 5-10 more minutes and check again.
+
+---
+
+### Step 5: Create Cluster (~10 minutes)
+
+Create the 3-node Kubernetes cluster:
+
+```bash
+./appd-create-cluster.sh --team 1
+```
+
+**What happens:**
+1. Verifies all VMs bootstrapped successfully
+2. Scans and adds VM2/VM3 host keys to VM1
+3. Runs `appdctl cluster init <VM2_IP> <VM3_IP>` on VM1
+4. Creates highly-available MicroK8s cluster with dqlite
+
+**Cluster creation complete when you see:**
+```
+✅ CLUSTER INITIALIZATION COMPLETE!
+```
+
+**Verify cluster:**
+```bash
+./scripts/ssh-vm1.sh --team 1
+appdctl show cluster
+```
+
+Expected output:
+```
+NODE             | ROLE  | RUNNING
+-----------------|-------|--------
+10.1.0.10:19001  | voter | true
+10.1.0.20:19001  | voter | true
+10.1.0.30:19001  | voter | true
 ```
 
 ---
 
-### Phase 6: Install AppDynamics Services (30 minutes)
+## ⚙️ Phase 4: Configuration
+
+### Step 6: Configure AppDynamics (~1 minute)
+
+Update `globals.yaml.gotmpl` with team-specific DNS:
+
+```bash
+./appd-configure.sh --team 1
+```
+
+**What happens:**
+1. Downloads current `globals.yaml.gotmpl` from VM1
+2. Updates these fields:
+   - `wildcard_ingress_dns_domain`
+   - `public_controller_host_name`
+   - `events_service_external_dns_name`
+   - `auth_saml_dns_name`
+3. Uploads updated file back to VM1
+
+**Configuration complete when you see:**
+```
+✅ CONFIGURATION COMPLETE!
+```
+
+---
+
+## 📦 Phase 5: Installation
+
+### Step 7: Install AppDynamics (~20-30 minutes)
 
 Install all AppDynamics services:
 
 ```bash
-./appd-install.sh config/team1.cfg
+./appd-install.sh --team 1
 ```
 
-This will:
-- Install operators (cert-manager, postgres, mysql, kafka, elasticsearch)
-- Install core services (Controller, Events, EUM, Synthetic)
-- Install AIOps (Anomaly Detection)
-- Install SecureApp
-- Install ATD (Automatic Transaction Diagnostics)
-- Verify all services are running
+**What happens:**
+1. Verifies cluster health
+2. Runs `appdcli start all small` on VM1
+3. Monitors installation progress every 60 seconds
+4. Waits for all services to show "Success"
 
-**Expected output:**
+**Services installed:**
+- Controller
+- Events Service  
+- EUM (End User Monitoring)
+- Synthetic Monitoring
+- AIOps
+- ATD (Automatic Transaction Diagnostics)
+- SecureApp (Secure Application)
+
+**Installation takes 20-30 minutes.** The script automatically monitors progress.
+
+**Installation complete when you see:**
 ```
-✅ All services installed successfully!
-
-Service Status:
-  Controller        ✅ Success
-  Events            ✅ Success
-  EUM Collector     ✅ Success
-  EUM Aggregator    ✅ Success
-  Anomaly Detection ✅ Success
-  SecureApp         ✅ Success
-  ATD               ✅ Success
-
-Time: ~30 minutes
+✅ INSTALLATION COMPLETE!
 ```
 
 ---
 
-### Phase 7: Verify & Access (5 minutes)
+## ✅ Phase 6: Verification
 
-Check system health and access your Controller:
+### Step 8: Verify & Access (~1 minute)
+
+Check that all services are running:
 
 ```bash
-./appd-check-health.sh config/team1.cfg
+./appd-check-health.sh --team 1
 ```
 
-**Access your Controller:**
-1. Open browser: `https://controller-team1.splunkylabs.com/controller/`
-2. Login:
+Expected output:
+```
+PROFILE         | SERVICE                  | STATUS
+----------------|--------------------------|--------
+platform        | appdynamics-infra        | Success
+...
+small           | appd-controller          | Success
+small           | appd-events-service      | Success
+...
+```
+
+**All services should show "Success".**
+
+---
+
+### Access Your Controller
+
+1. **Open Controller UI:**
+   ```
+   https://controller-team1.splunkylabs.com/controller/
+   ```
+
+2. **Login:**
    - Username: `admin`
    - Password: `welcome`
-3. Explore the interface!
+
+3. **⚠️ CHANGE PASSWORD IMMEDIATELY!**
+   - Click admin (top right) → My Account → Password
+
+4. **Apply License:**
+   - Wait for instructor to provide license file
+   - Settings → License → Upload
 
 ---
 
-## 🔍 Verification & Testing
+## 🔍 Monitoring & Troubleshooting
 
-### Check VM Status
+### Check Service Status
+
+**On VM:**
 ```bash
-# SSH to primary VM
-ssh appduser@<vm1-ip>
-
-# Check bootstrap
-appdctl show boot
-
-# Check cluster
-appdctl show cluster
-
-# Check services
-appdcli ping
-
-# Check pods
-kubectl get pods --all-namespaces
+./scripts/ssh-vm1.sh --team 1
+appdcli status          # Quick status
+appdcli ping            # Detailed health check
+kubectl get pods -A     # Kubernetes pods
 ```
 
-### Check Service Endpoints
-- **Controller:** https://controller-team1.splunkylabs.com/controller/
-- **Events:** https://controller-team1.splunkylabs.com/events
-- **EUM Aggregator:** https://controller-team1.splunkylabs.com/eumaggregator
+### View Logs
+
+**On VM:**
+```bash
+# AppD operator logs
+kubectl logs -n appdynamics -l app=appdynamics-operator
+
+# Controller logs
+kubectl logs -n appdcontroller <controller-pod-name>
+
+# Events Service logs
+kubectl logs -n events-service <events-pod-name>
+```
+
+### Common Issues
+
+#### SSH Key Corruption
+**Problem:** SSH keys stop working after cluster creation
+
+**Solution:** Re-setup SSH keys:
+```bash
+./scripts/setup-ssh-keys.sh --team 1
+```
+
+#### Services Stuck in "Starting"
+**Problem:** `appdcli ping` shows services not ready after 30 minutes
+
+**Solution:** Check pod status and logs:
+```bash
+./scripts/ssh-vm1.sh --team 1
+kubectl get pods -A | grep -v Running
+kubectl describe pod <pod-name> -n <namespace>
+kubectl logs <pod-name> -n <namespace>
+```
+
+#### Bootstrap Not Complete
+**Problem:** Cluster init fails with "host-info.yaml not found"
+
+**Solution:** Ensure bootstrap completed and image extraction finished:
+```bash
+./scripts/ssh-vm1.sh --team 1
+appdctl show boot  # All tasks must be "Succeeded"
+```
+
+Wait for `load-images` task to complete (~15-20 minutes after bootstrap).
 
 ---
 
-## 🧹 Cleanup (When Done)
+## 🧹 Cleanup
 
-Delete all your team's resources:
+### Delete All Resources
+
+When lab is complete, delete all AWS resources:
 
 ```bash
-./lab-cleanup.sh config/team1.cfg
+./lab-cleanup.sh --team 1 --confirm
 ```
 
-**This will delete:**
-- All 3 EC2 instances
+You'll be prompted to type: `DELETE TEAM 1`
+
+**This deletes:**
+- All EC2 instances
 - Load balancer
-- DNS records
-- VPC and networking
+- VPC and subnets
 - Security groups
+- Elastic IPs
+- DNS records
 
-**Cost:** ~$3.20/hour while running. Always cleanup when done!
+**Cost savings:** Deleting resources immediately after lab prevents unnecessary charges (~$20/day per team).
 
 ---
 
 ## 📚 Additional Resources
 
-### Documentation
-- [Quick Reference](QUICK_REFERENCE.md) - Commands and URLs
-- [TEAM2_BUILD.md](TEAM2_BUILD.md) - Example complete build
-- [docs/INSTRUCTOR_GUIDE.md](docs/INSTRUCTOR_GUIDE.md) - For instructors
-- [docs/DEPLOYMENT_SUMMARY.md](docs/DEPLOYMENT_SUMMARY.md) - Architecture
+### Documentation Files
+- **START_HERE.md** - Quick start guide (this is better for students)
+- **QUICK_REFERENCE.md** - Command reference
+- **README.md** - Project documentation
+- **FIX-REQUIRED.md** - Known issues and workarounds
 
-### Help & Support
-- **Lab Issues:** Check troubleshooting section above
-- **Instructor Help:** See [docs/INSTRUCTOR_GUIDE.md](docs/INSTRUCTOR_GUIDE.md)
-- **AppDynamics Docs:** https://docs.appdynamics.com/
-
----
-
-## ⚠️ Important Notes
-
-### Security
-- **SSH Access:** Only from Cisco VPN (automatic)
-- **HTTPS Only:** Valid SSL certificates (AWS ACM)
-- **Credentials:** Never commit to Git
-
-### Costs
-- **Running:** ~$3.20/hour per team
-- **All 5 Teams:** ~$16/hour total
-- **Always cleanup when done!**
-
-### Team Isolation
-- Each team has separate VPC
-- No network connectivity between teams
-- Unique URLs per team
-- Independent resources
+### AppDynamics Documentation
+- Official Docs: https://docs.appdynamics.com/
+- Virtual Appliance Guide: https://docs.appdynamics.com/display/latest/Install+AppDynamics+with+the+Virtual+Appliance
 
 ---
 
 ## 🎓 Learning Objectives
 
 By completing this lab, you will:
-1. ✅ Deploy AWS infrastructure (VPC, EC2, ALB, Route 53)
-2. ✅ Configure networking and security groups
-3. ✅ Create Kubernetes clusters (MicroK8s)
-4. ✅ Install and configure AppDynamics
-5. ✅ Manage SSL certificates (AWS ACM)
-6. ✅ Implement DNS (Route 53)
-7. ✅ Practice infrastructure automation
+- ✅ Deploy infrastructure as code using AWS CLI
+- ✅ Configure multi-node Kubernetes cluster (MicroK8s)
+- ✅ Install and configure AppDynamics platform
+- ✅ Understand AppDynamics architecture
+- ✅ Troubleshoot distributed systems
+- ✅ Manage SSL certificates and DNS
+- ✅ Work with cloud security (VPN, security groups)
 
 ---
 
-## 📞 Getting Help
+## 📊 Lab Metrics
 
-**During Lab:**
-1. Check `./appd-check-health.sh config/team1.cfg`
-2. Review [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-3. Ask your instructor
-4. Check AWS Console for resource status
+**Per Team Resources:**
+- **VMs:** 3
+- **vCPUs:** 48 total
+- **RAM:** 192GB total
+- **Storage:** 2.1TB total
+- **Cost:** ~$20 for 8-hour lab
 
-**Common Issues:**
-- **SSH timeout:** Verify Cisco VPN connection
-- **DNS not resolving:** Wait 2-3 minutes for propagation
-- **Pods not starting:** Check resources with `kubectl top nodes`
-- **Services failed:** Retry the installation command
-
----
-
-## ✅ Success Checklist
-
-- [ ] All VMs deployed and accessible via SSH
-- [ ] Cluster created (3 nodes, all ready)
-- [ ] All services show "Success" in `appdcli ping`
-- [ ] Controller UI accessible via HTTPS
-- [ ] Login successful (admin/welcome)
-- [ ] SSL certificate valid (no browser warnings)
-- [ ] DNS resolves correctly
-
-**Congratulations! Your AppDynamics cluster is ready!** 🎉
+**Total for 5 Teams:**
+- **VMs:** 15
+- **vCPUs:** 240 total
+- **Cost:** ~$100 for 8-hour lab
 
 ---
 
-## 📝 Lab Completion
+**Questions?** Ask your instructor or refer to troubleshooting sections above.
 
-When finished:
-1. Take screenshots of:
-   - Controller login screen
-   - `appdcli ping` output showing all services
-   - Controller dashboard
-2. Document any issues encountered
-3. **Run cleanup:** `./lab-cleanup.sh config/team1.cfg`
-4. Verify all resources deleted in AWS Console
-
----
-
-**Ready to start?** Begin with Phase 1: Initial Setup! 🚀
+**Happy Learning!** 🎓

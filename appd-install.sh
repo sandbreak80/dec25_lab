@@ -172,16 +172,6 @@ cat << EOF
 📊 Service Status:
   Run on VM1: appdcli ping
 
-📝 Next Steps:
-  1. Log in to Controller UI
-  2. Change admin password
-  3. Apply license (when received)
-  4. Configure applications
-  5. Deploy agents
-
-🔍 Troubleshooting:
-  ./appd-check-health.sh --team ${TEAM_NUMBER}
-
 EOF
 
 mark_step_complete "appd-installed" "$TEAM_NUMBER"

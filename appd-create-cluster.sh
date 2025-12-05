@@ -394,18 +394,6 @@ Expected cluster output:
  $VM2_PRIV:19001  | voter | true    
  $VM3_PRIV:19001  | voter | true
 
-📝 Next Steps:
-  1. Configure cluster:
-     ./appd-configure.sh --team ${TEAM_NUMBER}
-
-  2. Install AppDynamics:
-     ./appd-install.sh --team ${TEAM_NUMBER}
-
-📚 Manual cluster check (optional):
-  ./scripts/ssh-vm1.sh --team ${TEAM_NUMBER}
-  appdctl show cluster
-  microk8s status
-
 EOF
 
 mark_step_complete "cluster-initialized" "$TEAM_NUMBER"

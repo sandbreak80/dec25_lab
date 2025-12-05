@@ -1,32 +1,43 @@
 # Quick Reference - AppDynamics AWS Lab
 
-**Common commands and information for quick access during the lab.**
+**Common commands for quick access during the lab.**
 
 ---
 
-## 🚀 Main Scripts (Run in Order)
+## 🚀 Deployment Commands (Run in Order)
 
 ```bash
 # 1. Deploy infrastructure (~10 min)
-./lab-deploy.sh config/team1.cfg
+./lab-deploy.sh --team 1
 
-# 2. Bootstrap VMs (~5 min)
-./appd-bootstrap-vms.sh config/team1.cfg
+# 2. Change password (~1 min)
+./appd-change-password.sh --team 1
 
-# 3. Create cluster (~5 min)
-./appd-create-cluster.sh config/team1.cfg
+# 3. Setup SSH keys (~1 min) - RECOMMENDED
+./scripts/setup-ssh-keys.sh --team 1
 
-# 4. Configure AppDynamics (~3 min)
-./appd-configure.sh config/team1.cfg
+# 4. Bootstrap VMs (~5 min + 15-20 min wait)
+./appd-bootstrap-vms.sh --team 1
 
-# 5. Install services (~30 min)
-./appd-install.sh config/team1.cfg
+# 5. Verify bootstrap complete (wait 15-20 min after step 4)
+./scripts/ssh-vm1.sh --team 1
+appdctl show boot  # All should show "Succeeded"
+exit
 
-# 6. Check health
-./appd-check-health.sh config/team1.cfg
+# 6. Create cluster (~10 min)
+./appd-create-cluster.sh --team 1
 
-# 7. Cleanup (when done)
-./lab-cleanup.sh config/team1.cfg
+# 7. Configure (~1 min)
+./appd-configure.sh --team 1
+
+# 8. Install (~20-30 min)
+./appd-install.sh --team 1
+
+# 9. Verify
+./appd-check-health.sh --team 1
+
+# 10. Cleanup (when done)
+./lab-cleanup.sh --team 1 --confirm
 ```
 
 ---
@@ -36,257 +47,193 @@
 | Service | URL |
 |---------|-----|
 | Controller | https://controller-team1.splunkylabs.com/controller/ |
-| Events | https://controller-team1.splunkylabs.com/events |
-| EUM Aggregator | https://controller-team1.splunkylabs.com/eumaggregator |
-| Auth Service | https://team1.auth.splunkylabs.com |
+| Auth Service | https://customer1-team1.auth.splunkylabs.com/ |
 
 **Default Login:**
 - Username: `admin`
-- Password: `welcome`
+- Password: `welcome` (change immediately!)
 
 ---
 
 ## 💻 SSH Access
 
+**Passwordless (after SSH key setup):**
 ```bash
-# Get IPs from deployment output or check AWS console
-
-# VM1 (Primary - use for cluster commands)
-ssh appduser@<vm1-ip>
-
-# VM2
-ssh appduser@<vm2-ip>
-
-# VM3
-ssh appduser@<vm3-ip>
+./scripts/ssh-vm1.sh --team 1
+./scripts/ssh-vm2.sh --team 1
+./scripts/ssh-vm3.sh --team 1
 ```
 
-**Default password:** `changeme` (or check with instructor)
+**Manual SSH:**
+```bash
+# Get VM IPs from deployment
+cat state/team1/vm-summary.txt
+
+# SSH manually
+ssh appduser@<VM-IP>
+# Password: AppDynamics123!
+```
 
 ---
 
-## 🔍 Verification Commands
+## 🔍 Status Commands
 
-### On Your Laptop
+**On VM (SSH into VM first):**
 ```bash
-# Check VPN
-curl ifconfig.me
-# Should show: 151.186.*
-
-# Check AWS access
-aws sts get-caller-identity
-
-# Check DNS
-nslookup controller-team1.splunkylabs.com
-
-# Check health
-./appd-check-health.sh config/team1.cfg
-```
-
-### On VMs (via SSH)
-```bash
-# Check bootstrap status
+# Bootstrap status
 appdctl show boot
 
-# Check cluster status
+# Cluster status
 appdctl show cluster
 
-# Verify MicroK8s
-microk8s status
-
-# Check services
+# AppDynamics services
+appdcli status
 appdcli ping
 
-# List all pods
+# Kubernetes
+microk8s status
 kubectl get pods --all-namespaces
-
-# Check specific namespace
-kubectl get pods -n cisco-controller
-kubectl get pods -n cisco-aiops
-kubectl get pods -n cisco-secureapp
-
-# Check node resources
-kubectl top nodes
-
-# Check pod resources
-kubectl top pods --all-namespaces
 ```
 
----
-
-## 🐛 Troubleshooting
-
-### SSH Timeout
+**From laptop:**
 ```bash
-# Verify VPN
-curl ifconfig.me  # Should show 151.186.*
+# Check deployment status
+./scripts/check-status.sh --team 1
 
-# Check instance is running
-aws ec2 describe-instances \
-  --filters "Name=tag:Team,Values=team1" "Name=instance-state-name,Values=running" \
-  --query "Reservations[].Instances[].[InstanceId,PublicIpAddress,State.Name]" \
-  --output table
-```
+# Health check
+./appd-check-health.sh --team 1
 
-### DNS Not Resolving
-```bash
-# Wait 2-3 minutes for DNS propagation
-
-# Check hosted zone
-aws route53 list-hosted-zones
-
-# Flush local DNS cache (Mac)
-sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder
-
-# Flush local DNS cache (Windows)
-ipconfig /flushdns
-```
-
-### Service Not Starting
-```bash
-# Check pod status
-kubectl get pods -n cisco-controller
-
-# Check pod logs
-kubectl logs <pod-name> -n cisco-controller
-
-# Check node resources
-kubectl top nodes
-
-# Restart pod (if needed)
-kubectl delete pod <pod-name> -n cisco-controller
-```
-
-### Installation Failed
-```bash
-# SSH to VM1
-ssh appduser@<vm1-ip>
-
-# Retry installation
-appdcli start appd small
-
-# Check for permission errors
-ls -la /var/appd/config/secrets.yaml
-
-# Fix permissions if needed
-sudo chmod 644 /var/appd/config/secrets.yaml
+# View state files
+ls -la state/team1/
+cat state/team1/urls.txt
+cat state/team1/vm-summary.txt
 ```
 
 ---
 
 ## 📊 Resource Information
 
-### EC2 Instances
-- **Type:** m5a.4xlarge
-- **vCPUs:** 16
-- **RAM:** 64 GB
-- **Storage:** 200 GB (gp3)
-- **Cost:** ~$1.07/hour per instance
-
-### Per Team Total
-- **Instances:** 3x m5a.4xlarge
-- **Cost:** ~$3.20/hour
-- **Monthly (24/7):** ~$2,304
-
-### All 5 Teams
-- **Total Cost:** ~$16/hour
-- **Lab Duration (4 hours):** ~$64
+**Per Team:**
+- **VMs:** 3 × m5a.4xlarge
+- **vCPUs:** 48 total (16 per VM)
+- **RAM:** 192GB total (64GB per VM)
+- **Storage:** 2.1TB total (700GB per VM)
+- **Cost:** ~$20 for 8-hour lab
 
 ---
 
-## 🔧 Useful AWS Commands
+## 🛠 Troubleshooting
 
+### SSH Connection Fails
 ```bash
-# List running instances
-aws ec2 describe-instances \
-  --filters "Name=instance-state-name,Values=running" \
-  --query "Reservations[].Instances[].[InstanceId,Tags[?Key=='Name'].Value|[0],PublicIpAddress]" \
-  --output table
+# Verify Cisco VPN connection
+curl ifconfig.me  # Should show 151.186.*.*
 
-# List VPCs
-aws ec2 describe-vpcs \
-  --query "Vpcs[].[VpcId,CidrBlock,Tags[?Key=='Name'].Value|[0]]" \
-  --output table
+# Re-setup SSH keys if broken
+./scripts/setup-ssh-keys.sh --team 1
+```
 
-# List load balancers
-aws elbv2 describe-load-balancers \
-  --query "LoadBalancers[].[LoadBalancerName,DNSName,State.Code]" \
-  --output table
+### Bootstrap Stuck
+```bash
+# Check bootstrap progress (on VM)
+./scripts/ssh-vm1.sh --team 1
+appdctl show boot
+journalctl -u appd-bootstrap -f
+```
 
-# Check DNS records
-aws route53 list-resource-record-sets \
-  --hosted-zone-id Z06491142QTF1FNN8O9PR \
-  --query "ResourceRecordSets[?contains(Name, 'team1')]" \
-  --output table
+### Cluster Init Fails
+```bash
+# Verify bootstrap completed first
+./scripts/ssh-vm1.sh --team 1
+appdctl show boot  # All must be "Succeeded"
+
+# Check network connectivity
+ping 10.1.0.20  # VM2 private IP
+ping 10.1.0.30  # VM3 private IP
+```
+
+### Services Won't Start
+```bash
+# Check pod status
+./scripts/ssh-vm1.sh --team 1
+kubectl get pods --all-namespaces
+kubectl describe pod <pod-name> -n <namespace>
+
+# Check logs
+kubectl logs <pod-name> -n <namespace>
+
+# Restart if needed
+appdcli stop all
+appdcli start all small
 ```
 
 ---
 
-## 📋 Configuration Files
+## 🧹 Cleanup Commands
 
-### Team Configs
-- `config/team1.cfg` - Team 1 configuration
-- `config/team2.cfg` - Team 2 configuration
-- `config/team3.cfg` - Team 3 configuration
-- `config/team4.cfg` - Team 4 configuration
-- `config/team5.cfg` - Team 5 configuration
-
-### Key Settings (per team)
+**Full cleanup:**
 ```bash
-TEAM_NAME="Team 1"
-TEAM_NUMBER=1
-VPC_CIDR="10.1.0.0/16"
-DNS_SUBDOMAIN="team1"
-CONTROLLER_SUBDOMAIN="controller-team1"
+./lab-cleanup.sh --team 1 --confirm
+# Type: DELETE TEAM 1
+```
+
+**Manual cleanup (if script fails):**
+```bash
+# Delete VMs
+aws ec2 terminate-instances --instance-ids $(cat state/team1/vm*.id)
+
+# Delete load balancer
+aws elbv2 delete-load-balancer --load-balancer-arn $(cat state/team1/alb.id)
+
+# Delete VPC
+aws ec2 delete-vpc --vpc-id $(cat state/team1/vpc.id)
 ```
 
 ---
 
-## 🎯 Service Status Check
+## 📝 Configuration Files
 
+**Team configs:**
 ```bash
-# Quick check all services
-ssh appduser@<vm1-ip> "appdcli ping"
+config/team1.cfg  # Team 1
+config/team2.cfg  # Team 2
+...
+```
 
-# Expected output:
-# Controller        ✅ Success
-# Events            ✅ Success  
-# EUM Collector     ✅ Success
-# EUM Aggregator    ✅ Success
-# Anomaly Detection ✅ Success
-# SecureApp         ✅ Success
-# ATD               ✅ Success
+**State files (per team):**
+```bash
+state/team1/vpc.id           # VPC ID
+state/team1/vm-summary.txt   # VM IPs
+state/team1/urls.txt         # Access URLs
+state/team1/alb-dns.txt      # Load balancer DNS
 ```
 
 ---
 
-## 🗑️ Cleanup
+## 🔐 Credentials
 
-```bash
-# Delete all team resources
-./lab-cleanup.sh config/team1.cfg
+**VM Access:**
+- User: `appduser`
+- Initial password: `changeme`
+- After change: `AppDynamics123!`
 
-# Verify deletion
-aws ec2 describe-instances \
-  --filters "Name=tag:Team,Values=team1" \
-  --query "Reservations[].Instances[].[InstanceId,State.Name]" \
-  --output table
-```
+**Controller UI:**
+- User: `admin`
+- Password: `welcome` (change immediately!)
 
----
-
-## 📱 Contact
-
-**During Lab:**
-- Instructor assistance
-- Check TROUBLESHOOTING.md
-- AWS Console for resource status
-
-**After Lab:**
-- Document issues encountered
-- Collect feedback
-- Review learning objectives
+**AWS:**
+- Configured via `aws configure`
+- Region: `us-west-2`
 
 ---
 
-**Quick Tip:** Bookmark this page for easy reference during the lab! 🔖
+## 📚 Additional Help
+
+- **START_HERE.md** - Step-by-step deployment guide
+- **LAB_GUIDE.md** - Detailed lab instructions
+- **README.md** - Complete documentation
+- **FIX-REQUIRED.md** - Known issues
+
+---
+
+**Need help?** Ask your instructor or check the troubleshooting section above.

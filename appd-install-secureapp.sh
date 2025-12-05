@@ -176,15 +176,6 @@ cat << EOF
   3. Select your application
   4. Click "Security" tab
 
-📝 Next Steps:
-  1. Deploy application with SecureApp agent
-  2. Configure security policies
-  3. Monitor security events
-  4. Review compliance reports
-
-📚 Documentation:
-  https://docs.appdynamics.com/secureapp
-
 EOF
 
 mark_step_complete "secureapp-installed" "$TEAM_NUMBER"

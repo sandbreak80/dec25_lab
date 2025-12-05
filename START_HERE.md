@@ -1,174 +1,190 @@
-# AppDynamics Lab - Quick Start Guide
+# AppDynamics Lab - Start Here
 
-## 🚀 First Time Setup
+Welcome! This guide will walk you through deploying your AppDynamics lab environment in AWS.
 
-### Step 1: Deploy Infrastructure
+## 📋 Before You Begin
 
-Deploy your lab environment:
+### Prerequisites
+- [ ] AWS credentials configured (`aws configure`)
+- [ ] Connected to Cisco VPN
+- [ ] Assigned a team number (1-5)
 
+**Verify prerequisites:**
 ```bash
-./lab-deploy.sh --team 1
+./scripts/check-prerequisites.sh
 ```
-
-**This takes ~30 minutes and creates:**
-- ✅ VPC with 2 subnets
-- ✅ 3 VMs (m5a.4xlarge: 16 vCPU, 64GB RAM each)
-- ✅ Application Load Balancer
-- ✅ SSL certificate (*.splunkylabs.com)
-- ✅ DNS records (team1.splunkylabs.com)
-- ✅ Security groups (SSH restricted to Cisco VPN)
 
 ---
 
-## 🔑 Step 2: Change appduser Password (REQUIRED!)
+## 🚀 Deployment Steps
 
-**CRITICAL**: Change the default password before bootstrap!
+### Step 1: Deploy Infrastructure (~10 minutes)
+
+Deploy your team's AWS resources (VPC, VMs, Load Balancer, DNS):
+
+```bash
+./lab-deploy.sh --team 1
+# Replace "1" with your team number
+```
+
+**What gets created:**
+- 3 EC2 instances (m5a.4xlarge: 16 vCPU, 64GB RAM each)
+- Application Load Balancer with SSL certificate
+- DNS records (team1.splunkylabs.com)
+- Security groups
+
+---
+
+### Step 2: Change Password (~1 minute)
+
+Change the default `appduser` password:
 
 ```bash
 ./appd-change-password.sh --team 1
 ```
 
-**Default behavior:**
-- Sets password to: `AppDynamics123!`
-- Or specify custom: `./appd-change-password.sh --team 1 --password "YourPassword"`
-
-**Why?** The appduser account has default password "changeme" that must be changed.
+**Default password:** `changeme`  
+**New password:** `AppDynamics123!`
 
 ---
 
-## 🔐 Step 3: Setup SSH Keys (HIGHLY RECOMMENDED!)
+### Step 3: Setup SSH Keys (~1 minute) **RECOMMENDED**
 
-**Avoid typing password 30-50 times during the lab!**
+Setup passwordless SSH access (saves typing password 30+ times!):
 
 ```bash
 ./scripts/setup-ssh-keys.sh --team 1
 ```
 
-**What this does:**
-- Generates SSH key pair on your laptop
-- Copies public key to all 3 VMs
-- Enables passwordless SSH for all automation
-- Updates SSH config for easy access
-
-**Time:** 1 minute  
-**Benefit:** All subsequent SSH is passwordless! 🎉
-
-**Note:** This is optional but HIGHLY recommended for a better lab experience!
+After this completes, you can SSH without entering password:
+```bash
+./scripts/ssh-vm1.sh --team 1
+```
 
 ---
 
-## 🔐 Step 4: Bootstrap VMs (REQUIRED!)
+### Step 4: Bootstrap VMs (~5 minutes + 15-20 minute wait)
 
-**CRITICAL**: VMs must be bootstrapped before AppDynamics can be installed!
+Initialize all 3 VMs with `appdctl host init`:
 
 ```bash
 ./appd-bootstrap-vms.sh --team 1
 ```
 
-**What this does:**
-- Runs `appdctl host init` on each VM
-- Configures hostname, network, storage
-- Sets up firewall, SSH, certificates
-- Prepares VMs for AppDynamics cluster
+**IMPORTANT:** After this completes, the VMs will extract a large image file (~15-20 minutes). **Do not proceed until this finishes!**
 
-**Note:** 
-- If you setup SSH keys (Step 3), this runs passwordless!
-- Without keys, you'll need to enter password multiple times
-
-**Time:** ~5 minutes
+**Verify bootstrap is complete:**
+```bash
+./scripts/ssh-vm1.sh --team 1
+appdctl show boot
+# All tasks should show "Succeeded"
+exit
+```
 
 ---
 
-## 🔗 Step 5: Create AppDynamics Cluster
+### Step 5: Create Cluster (~10 minutes)
+
+Create the 3-node Kubernetes cluster:
 
 ```bash
 ./appd-create-cluster.sh --team 1
 ```
 
+This will create a highly-available MicroK8s cluster across all 3 VMs.
+
 ---
 
-## ⚙️ Step 6: Configure & Install AppDynamics
+### Step 6: Configure AppDynamics (~1 minute)
+
+Update the AppDynamics configuration with your team's DNS settings:
 
 ```bash
-# Configure cluster
 ./appd-configure.sh --team 1
+```
 
-# Install AppDynamics services
+---
+
+### Step 7: Install AppDynamics (~20-30 minutes)
+
+Install all AppDynamics services:
+
+```bash
 ./appd-install.sh --team 1
 ```
 
----
-
-## 🌐 Step 7: Access Web UI
-
-After deployment completes and AppDynamics is installed:
-
-```
-Controller: https://controller-team1.splunkylabs.com/controller/
-Username: admin
-Password: welcome (change after first login)
-```
+The script will automatically monitor installation progress. This takes 20-30 minutes.
 
 ---
 
-## 🧹 Step 8: Cleanup (End of Lab)
+### Step 8: Verify & Access (~1 minute)
 
-**IMPORTANT**: Delete all resources to avoid charges!
+Check that all services are running:
+
+```bash
+./appd-check-health.sh --team 1
+```
+
+**Access your Controller:**
+- URL: `https://controller-team1.splunkylabs.com/controller/`
+- Username: `admin`
+- Password: `welcome`
+
+⚠️ **Change the admin password immediately!**
+
+---
+
+## 🧹 Cleanup
+
+When you're done with the lab, delete all resources:
 
 ```bash
 ./lab-cleanup.sh --team 1 --confirm
+# You'll be prompted to type: DELETE TEAM 1
 ```
 
-**Cost**: ~$2.50/hour = ~$20 for 8-hour lab day
+---
+
+## 📚 Additional Documentation
+
+- **LAB_GUIDE.md** - Detailed lab instructions
+- **QUICK_REFERENCE.md** - Common commands reference
+- **README.md** - Project documentation
+- **FIX-REQUIRED.md** - Known issues and workarounds
 
 ---
 
 ## 🆘 Troubleshooting
 
 ### SSH Connection Issues
+**Problem:** Can't SSH to VMs
+
+**Solution:** Ensure you're connected to Cisco VPN:
 ```bash
-# Make sure you changed the password first
-./appd-change-password.sh --team 1
+curl ifconfig.me
+# Should show: 151.186.*.*
+```
 
-# Setup SSH keys for passwordless access (recommended!)
-./scripts/setup-ssh-keys.sh --team 1
+### Bootstrap Not Complete
+**Problem:** Cluster creation fails
 
-# Then SSH works easily
+**Solution:** Wait for image extraction to finish (~15-20 min after bootstrap):
+```bash
 ./scripts/ssh-vm1.sh --team 1
+appdctl show boot  # All should be "Succeeded"
 ```
 
-### Can't SSH from home/non-VPN
-SSH is restricted to Cisco VPN IPs only. Connect to VPN first!
+### Services Not Starting
+**Problem:** Installation times out
 
----
-
-## 📚 Full Documentation
-
-- **Lab Guide**: `./LAB_GUIDE.md` - Complete step-by-step instructions
-- **Quick Reference**: `./QUICK_REFERENCE.md` - Common commands
-- **Instructor Guide**: `./docs/INSTRUCTOR_GUIDE.md` - Setup and management
-
----
-
-## 🔑 SSH Access Summary
-
-| Step | Method | Details |
-|------|--------|---------|
-| Initial | Password | `appduser` / `changeme` |
-| After Step 2 | Password | `appduser` / `AppDynamics123!` |
-| After Step 3 | Passwordless | SSH key authentication ✅ |
-
-**To connect:**
+**Solution:** Services can take up to 30 minutes. Check status:
 ```bash
-# With SSH keys (after step 3) - EASY!
-./scripts/ssh-vm1.sh --team 1  # No password needed!
-
-# Or use SSH config shortcut
-ssh appd-team1-vm1  # No password needed!
-
-# Without SSH keys (manual)
-ssh appduser@<VM-IP>
-# Password: AppDynamics123!
+./scripts/ssh-vm1.sh --team 1
+appdcli ping
 ```
 
-**💡 Pro Tip:** Setup SSH keys (Step 3) to make the lab experience much smoother!
+---
+
+**Total Time:** ~60-90 minutes (mostly automated waiting)
+
+**Happy Learning!** 🎓
