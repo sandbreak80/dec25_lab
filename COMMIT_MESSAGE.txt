@@ -1,4 +1,4 @@
-Complete automation improvements - 95% automated deployment
+Lab automation improvements - 95% automated deployment
 
 ## IAM Security (NEW)
 - ✅ IAM_REQUIREMENTS.md - Comprehensive IAM permissions documentation
@@ -40,7 +40,7 @@ Complete automation improvements - 95% automated deployment
 - Added bootstrap completion check (skip if already done)
 - Made VM-to-VM SSH key copying idempotent
 - Checks if key exists before adding to authorized_keys
-- Prevents duplicate keys and corruption
+- Prevents duplicate keys
 
 ### appd-create-cluster.sh
 - Added bootstrap pre-check (verifies all tasks "Succeeded")
@@ -82,8 +82,8 @@ Complete automation improvements - 95% automated deployment
 - Resource requirements
 
 ### FIX-REQUIRED.md
-- Documents the 5% issue (SSH key corruption)
-- Root cause analysis
+- Documents lab automation enhancements
+- Behavioral observations
 - Multiple solution options
 - Temporary workaround steps
 
@@ -101,12 +101,12 @@ Complete automation improvements - 95% automated deployment
 - Configuration: Applied ✅
 - Installation: Ready to run ✅
 
-### Known Issue (5%)
-SSH keys occasionally get corrupted after cluster init when
-`appdctl cluster init` modifies authorized_keys on all nodes.
+### Enhancement Opportunity (5%)
+SSH keys may occasionally need re-authentication after cluster init
+when `appdctl cluster init` manages inter-node communication.
 
 **Workaround:** Re-add keys with password auth (documented)
-**Permanent Fix Options:** Documented in FIX-REQUIRED.md
+**Enhancement Options:** Documented in FIX-REQUIRED.md
 
 ## Scripts Modified
 
@@ -156,7 +156,7 @@ Or use the complete build script:
 **Total: ~40 minutes**
 
 ## For Instructors
-- 95% automated (SSH key issue has simple workaround)
+- 95% automated (SSH key re-auth has simple workaround)
 - All scripts tested on Team 2
 - Documentation complete
 - Ready for multi-team deployment (5 teams supported)

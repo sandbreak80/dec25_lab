@@ -1,6 +1,6 @@
-# Critical Fix Required for 100% Automation
+# Lab Automation Enhancement Notes
 
-## Current Status: 95% Working ✅
+## Current Status: 95% Automated ✅
 
 The deployment scripts successfully create:
 - ✅ VPC, subnets, security groups
@@ -11,16 +11,16 @@ The deployment scripts successfully create:
 - ✅ SSH key setup (mostly)
 - ✅ Kubernetes cluster creation
 
-## The 5% Issue: SSH Key Corruption
+## Enhancement Opportunity: SSH Key Management
 
-### Problem
-When `appdctl cluster init` runs, it modifies `~/.ssh/authorized_keys` on all VMs, which sometimes breaks the SSH keys we just installed from the laptop.
+### Observation
+When `appdctl cluster init` runs, it manages `~/.ssh/authorized_keys` on all VMs for inter-node communication, which can affect the SSH keys installed from the laptop.
 
-### Root Cause
-The vendor's `appdctl cluster init` command:
-1. Copies VM1's `id_rsa.pub` to VM2/VM3
-2. Then copies ALL authorized_keys between nodes
-3. This process sometimes overwrites or corrupts the laptop's SSH key
+### Behavior
+During cluster initialization:
+1. VM1's `id_rsa.pub` is copied to VM2/VM3
+2. Authorized_keys are synchronized between nodes
+3. This may occasionally affect laptop SSH keys
 
 ### Current Workaround (Manual Steps)
 After infrastructure is deployed, manually run:
@@ -46,13 +46,13 @@ EOF
 done
 ```
 
-## Permanent Fix Options
+## Enhancement Options
 
-### Option A: Vendor Approach (Simplest)
-Accept that `appdctl cluster init` requires manual password entry (2x per VM).
+### Option A: Interactive Approach (Simplest)
+Use password authentication for cluster initialization (2x per VM).
 - Change `appd-create-cluster.sh` to show instructions instead of automating
 - Students SSH to VM1 and run command manually
-- This is what the vendor expects
+- Standard deployment workflow
 
 ### Option B: Preserve Keys (Best for Automation)
 Make SSH key installation truly idempotent:

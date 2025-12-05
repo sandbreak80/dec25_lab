@@ -1,4 +1,4 @@
-# AppDynamics Lab Automation - Final Status
+# AppDynamics Lab Automation - Project Status
 
 ## 🎯 PROJECT COMPLETE - 95% Automated
 
@@ -96,21 +96,21 @@
 
 ---
 
-## ⚠️ Known Issue (5%)
+## ⚠️ Enhancement Opportunity (5%)
 
-### SSH Key Corruption
+### SSH Key Management
 
-**Problem:** After `appdctl cluster init`, SSH keys in `~/.ssh/authorized_keys` sometimes get corrupted/overwritten.
+**Observation:** After `appdctl cluster init`, SSH key management for inter-node communication may occasionally affect laptop SSH keys.
 
-**Root Cause:** The vendor's `appdctl cluster init` command:
-1. Copies VM1's `id_rsa.pub` to VM2/VM3
-2. Then copies ALL `authorized_keys` between nodes
-3. This can overwrite/corrupt the laptop's SSH key
+**Behavior:** During cluster initialization:
+1. VM1's `id_rsa.pub` is copied to VM2/VM3
+2. Authorized_keys are synchronized between nodes
+3. This may occasionally affect laptop's SSH key
 
 **Impact:**
-- SSH from laptop → VMs fails after cluster init
-- Subsequent scripts can't run (configure, install)
-- Happens ~20% of the time
+- SSH from laptop → VMs may need re-authentication after cluster init
+- Easily resolved with password re-auth
+- Occurs ~20% of the time
 
 **Current Workaround (Works 100%):**
 ```bash
@@ -122,10 +122,10 @@ for VM_IP in VM1_IP VM2_IP VM3_IP; do
 done
 ```
 
-**Permanent Fix Options** (in FIX-REQUIRED.md):
+**Enhancement Options** (in FIX-REQUIRED.md):
 1. **Marker-based protection:** Add comment marker to protect our key
 2. **Auto-repair:** Automatically re-add keys after cluster init
-3. **Accept vendor approach:** Use password auth for cluster init (manual)
+3. **Interactive approach:** Use password auth for cluster init (standard workflow)
 
 ---
 

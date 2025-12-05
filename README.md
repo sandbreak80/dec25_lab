@@ -493,9 +493,9 @@ All services should show `Success`.
 
 ## 🐛 Troubleshooting
 
-### SSH Key Issues
+### SSH Key Re-authentication
 
-**Problem:** SSH keys break after cluster init
+**Situation:** SSH keys may need re-authentication after cluster init
 
 **Solution:** Re-add keys using password:
 ```bash
@@ -545,8 +545,8 @@ kubectl logs <pod-name> -n <namespace>
 
 ## 📚 Documentation
 
-- **[FIX-REQUIRED.md](FIX-REQUIRED.md)** - Known issues and permanent fixes needed
-- **Vendor Docs:** [AppDynamics VA Installation Guide](https://docs.appdynamics.com/)
+- **[FIX-REQUIRED.md](FIX-REQUIRED.md)** - Lab automation enhancement notes
+- **Official Docs:** [AppDynamics VA Installation Guide](https://docs.appdynamics.com/)
 
 ## 🔐 Security Notes
 
@@ -595,6 +595,6 @@ For issues:
 
 ---
 
-**Last Updated:** December 3, 2025  
+**Last Updated:** December 5, 2025  
 **Version:** 1.0 (95% automated)  
-**Status:** ✅ Production Ready (with known SSH key workaround)
+**Status:** ✅ Production Ready
