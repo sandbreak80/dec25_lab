@@ -6,7 +6,7 @@ Welcome! This guide will walk you through deploying your AppDynamics lab environ
 
 ### Prerequisites
 - [ ] AWS credentials configured (`aws configure`)
-- [ ] Connected to Cisco VPN
+- [ ] Connected to VPN
 - [ ] Assigned a team number (1-5)
 
 **Verify prerequisites:**
@@ -159,10 +159,10 @@ When you're done with the lab, delete all resources:
 ### SSH Connection Issues
 **Problem:** Can't SSH to VMs
 
-**Solution:** Ensure you're connected to Cisco VPN:
+**Solution:** Ensure you're connected to VPN:
 ```bash
 curl ifconfig.me
-# Should show: 151.186.*.*
+# Should show your VPN IP address
 ```
 
 ### Bootstrap Not Complete

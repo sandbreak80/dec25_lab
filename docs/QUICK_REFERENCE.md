@@ -126,8 +126,8 @@ cat state/team1/vm-summary.txt
 
 ### SSH Connection Fails
 ```bash
-# Verify Cisco VPN connection
-curl ifconfig.me  # Should show 151.186.*.*
+# Verify VPN connection
+curl ifconfig.me  # Should show your VPN IP address
 
 # Re-setup SSH keys if broken
 ./scripts/setup-ssh-keys.sh --team 1

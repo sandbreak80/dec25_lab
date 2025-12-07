@@ -16,7 +16,7 @@
 ```
 - VPC with 2 subnets across AZs
 - Internet Gateway and route tables
-- Security groups (Cisco VPN SSH access)
+- Security groups (VPN SSH access)
 - 3x m5a.4xlarge EC2 instances
 - Elastic IPs (persistent)
 - ENI per VM (vendor best practice)
@@ -232,7 +232,7 @@ NODE             | ROLE  | RUNNING
 
 ## 🔐 Security
 
-- ✅ SSH restricted to Cisco VPN IPs
+- ✅ SSH restricted to VPN IPs
 - ✅ HTTPS open to everyone (for Controller UI)
 - ✅ VM-to-VM communication isolated per team
 - ✅ Passwords changed from defaults

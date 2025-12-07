@@ -1,54 +1,123 @@
-Clean up project - remove duplicate instructions and sync docs with deployment
+Project reorganization - best practice directory structure
 
-## Documentation Updates
-- ✅ Rewrote START_HERE.md - clear 8-step deployment guide matching Team 2 build
-- ✅ Rewrote LAB_GUIDE.md - comprehensive guide with all phases and troubleshooting
-- ✅ Rewrote QUICK_REFERENCE.md - command reference for quick access
-- ✅ Deleted TEAM2_BUILD.md - duplicate content, now in main docs
-- ✅ All docs now use Team 1 as example (generic, not Team 2 specific)
-- ✅ Consistent workflow across all documentation
+## Organization Changes
 
-## Script Output Cleanup
-- ✅ Removed "Next Steps" from lab-deploy.sh (duplicated docs)
-- ✅ Removed "Next Steps" from appd-change-password.sh
-- ✅ Removed "Next Steps" from appd-bootstrap-vms.sh
-- ✅ Removed "Next Steps" from appd-create-cluster.sh
-- ✅ Removed "Next Steps" from appd-configure.sh
-- ✅ Removed "Next Steps" from appd-install.sh
-- ✅ Removed "Next Steps" from appd-install-secureapp.sh
+### New Directory Structure
+```
+Root (clean entry point):
+  ├── README.md           → Project overview
+  ├── START_HERE.md       → Student quick start
+  │
+  ├── deployment/         → All deployment scripts (NEW)
+  │   ├── 01-deploy.sh
+  │   ├── 02-change-password.sh
+  │   ├── 03-setup-ssh-keys.sh
+  │   ├── 04-bootstrap-vms.sh
+  │   ├── 05-create-cluster.sh
+  │   ├── 06-configure.sh
+  │   ├── 07-install.sh
+  │   ├── 08-verify.sh
+  │   ├── cleanup.sh
+  │   └── complete-build.sh
+  │
+  ├── docs/               → All documentation (ORGANIZED)
+  │   ├── LAB_GUIDE.md
+  │   ├── QUICK_REFERENCE.md
+  │   ├── IAM_REQUIREMENTS.md
+  │   ├── PROJECT_STATUS.md
+  │   ├── FIX-REQUIRED.md
+  │   └── instructor/
+  │
+  ├── scripts/            → Infrastructure automation
+  ├── config/             → Team configurations
+  ├── lib/                → Shared functions
+  ├── archive/            → Legacy content
+  ├── state/              → Deployment state
+  └── logs/               → Log files
+```
 
-**Rationale:** Scripts should execute cleanly without repeating what's 
-already documented. Students follow docs (START_HERE.md or LAB_GUIDE.md), 
-not script output. This reduces cognitive load and prevents confusion.
+### Benefits
+✅ Clean root directory (only README + START_HERE)
+✅ Numbered deployment scripts (clear sequence)
+✅ All docs in docs/ directory
+✅ Infrastructure scripts separate from deployment
+✅ Easy to navigate for students
+✅ Best practice project organization
 
-## Project Organization
-- ✅ Removed Team 2 specific documentation (TEAM2_BUILD.md)
-- ✅ State files remain for Team 2 (actual deployment)
-- ✅ Lab/ directory contains legacy/development history (preserved)
-- ✅ Root-level scripts are production scripts
-- ✅ Root-level docs are student-facing
+### Files Moved
 
-## Documentation Consistency
-All docs now follow this workflow (matching actual Team 2 deployment):
-1. Deploy infrastructure (lab-deploy.sh)
-2. Change password (appd-change-password.sh)
-3. Setup SSH keys (scripts/setup-ssh-keys.sh) - RECOMMENDED
-4. Bootstrap VMs (appd-bootstrap-vms.sh) + WAIT 15-20 min
-5. Create cluster (appd-create-cluster.sh)
-6. Configure (appd-configure.sh)
-7. Install (appd-install.sh)
-8. Verify (appd-check-health.sh)
+**Deployment Scripts:**
+- lab-deploy.sh → deployment/01-deploy.sh
+- appd-change-password.sh → deployment/02-change-password.sh
+- scripts/setup-ssh-keys.sh → deployment/03-setup-ssh-keys.sh
+- appd-bootstrap-vms.sh → deployment/04-bootstrap-vms.sh
+- appd-create-cluster.sh → deployment/05-create-cluster.sh
+- appd-configure.sh → deployment/06-configure.sh
+- appd-install.sh → deployment/07-install.sh
+- appd-check-health.sh → deployment/08-verify.sh
+- lab-cleanup.sh → deployment/cleanup.sh
+- complete-build.sh → deployment/complete-build.sh
+- appd-install-secureapp.sh → deployment/install-secureapp.sh
 
-## User Experience Improvements
-- ✅ Single source of truth: START_HERE.md for quick start
-- ✅ Detailed reference: LAB_GUIDE.md for comprehensive guide
-- ✅ Quick commands: QUICK_REFERENCE.md for copy/paste
-- ✅ No duplicate instructions between scripts and docs
-- ✅ Cleaner script output focuses on status, not instructions
-- ✅ All examples use Team 1 (generic) not Team 2 (specific)
+**Documentation:**
+- LAB_GUIDE.md → docs/
+- QUICK_REFERENCE.md → docs/
+- IAM_REQUIREMENTS.md → docs/
+- PROJECT_STATUS.md → docs/
+- FIX-REQUIRED.md → docs/
+- COMMIT_MESSAGE.txt → docs/
+- iam-student-policy.json → docs/
 
-Students now have:
-- Clear entry point (START_HERE.md)
-- Detailed guidance when needed (LAB_GUIDE.md)
-- Quick reference for common tasks (QUICK_REFERENCE.md)
-- Clean script output without clutter
+### Script Updates
+
+✅ All deployment scripts updated with correct paths:
+  - source "../lib/common.sh" (was "./lib/common.sh")
+  - ../scripts/ references (was ./scripts/)
+  - Numbered script references (01-deploy.sh, 02-change-password.sh, etc.)
+
+✅ complete-build.sh updated to use new numbered scripts
+
+### Documentation Updates
+
+✅ START_HERE.md - Updated all command paths
+✅ README.md - Updated project structure, quick start, documentation links
+✅ All docs now reference deployment/ directory
+
+### Student Experience
+
+Before:
+- 10+ script files at root level
+- 8 documentation files mixed with scripts
+- Confusing what to run first
+- No clear entry point
+
+After:
+- Clean root with README + START_HERE
+- deployment/ directory with numbered scripts (01-08)
+- docs/ directory with all documentation
+- Clear progression: 01 → 02 → 03 → etc.
+- Easy to find what you need
+
+### Migration Notes
+
+Scripts must now be called with new paths:
+```bash
+# OLD
+./lab-deploy.sh --team 1
+./appd-bootstrap-vms.sh --team 1
+
+# NEW
+./deployment/01-deploy.sh --team 1
+./deployment/04-bootstrap-vms.sh --team 1
+```
+
+Documentation now in docs/:
+```bash
+# OLD
+cat LAB_GUIDE.md
+
+# NEW
+cat docs/LAB_GUIDE.md
+```
+
+All paths tested and verified working.

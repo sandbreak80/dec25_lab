@@ -124,22 +124,15 @@ AWS_REGION="us-west-2"  # Change this if needed
 
 ### Network Requirements
 
-#### Cisco VPN Access
-SSH access to VMs requires connection to **Cisco VPN** (security group restricted).
-
-**Allowed IP ranges:**
-- `151.186.183.24/32` - Cisco VPN US-West egress 1
-- `151.186.183.87/32` - Cisco VPN US-West egress 2
-- `151.186.182.23/32` - Cisco VPN US-East egress 1
-- `151.186.182.87/32` - Cisco VPN US-East egress 2
-- `151.186.192.0/20` - Cisco VPN shared pool
+#### VPN Access
+SSH access to VMs requires VPN connection (security group restricted).
 
 **Before starting deployment:**
-1. Connect to Cisco AnyConnect VPN
-2. Verify your IP is in allowed range:
+1. Connect to your organization's VPN
+2. Verify your VPN connection:
    ```bash
    curl https://ifconfig.me
-   # Should show 151.186.x.x
+   # Should show your VPN IP address
    ```
 
 **Not on VPN?** You'll get SSH timeout errors during deployment.
@@ -177,7 +170,7 @@ Before running `./lab-deploy.sh`, verify:
 - [ ] AWS CLI v2 installed (`aws --version`)
 - [ ] AWS credentials configured (`aws sts get-caller-identity`)
 - [ ] AWS region set to `us-west-2` (`echo $AWS_REGION`)
-- [ ] Connected to Cisco VPN (`curl https://ifconfig.me`)
+- [ ] Connected to VPN (`curl https://ifconfig.me`)
 - [ ] `expect` and `jq` installed
 - [ ] Sufficient AWS quotas (3 instances, 48 vCPUs per team)
 - [ ] Team configuration reviewed (`config/teamN.cfg`)
@@ -235,7 +228,7 @@ Each team gets a complete, isolated environment:
 ### Infrastructure
 - **VPC**: Dedicated VPC with custom CIDR (10.N.0.0/16)
 - **Subnets**: 2 subnets in different availability zones
-- **Security**: SSH restricted to Cisco VPN IPs only
+- **Security**: SSH restricted to VPN IPs only
 - **Compute**: 3x m5a.4xlarge instances (16 vCPU, 64GB RAM each)
 - **Storage**: 
   - 200GB OS disk per VM (delete on termination)
@@ -368,12 +361,7 @@ NODE3_IP="10.1.0.30"
 
 ### Security Groups
 
-**SSH Access** is restricted to Cisco VPN egress IPs:
-- `151.186.183.24/32` (US-West egress 1)
-- `151.186.183.87/32` (US-West egress 2)
-- `151.186.182.23/32` (US-East egress 1)
-- `151.186.182.87/32` (US-East egress 2)
-- `151.186.192.0/20` (Shared pool)
+**SSH Access** is restricted to VPN egress IPs (configured in team config files).
 
 **HTTPS Access** is open to everyone (0.0.0.0/0)
 
@@ -530,9 +518,9 @@ watch -n 10 appdctl show boot
 
 ### Security Group Issues
 
-**Problem:** SSH timeout (not on Cisco VPN)
+**Problem:** SSH timeout (not on VPN)
 
-**Solution:** Connect to Cisco VPN first, or temporarily add your IP:
+**Solution:** Connect to VPN first, or temporarily add your IP:
 ```bash
 # Get security group ID
 SG_ID=$(aws ec2 describe-instances \
@@ -571,7 +559,7 @@ kubectl logs <pod-name> -n <namespace>
 - **SSH Keys:** Stored in `~/.ssh/appd-teamN-key` (not committed)
 - **AWS Credentials:** Never commit credentials to Git
 - **State Files:** `state/` and `logs/` are gitignored
-- **VPN Required:** SSH access requires Cisco VPN connection
+- **VPN Required:** SSH access requires VPN connection
 
 ## 📊 Resource Requirements
 

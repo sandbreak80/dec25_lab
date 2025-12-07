@@ -20,7 +20,7 @@ Deploy a complete AppDynamics cluster in AWS with:
 
 ### Required
 - [ ] AWS account with configured credentials
-- [ ] Cisco VPN connection
+- [ ] VPN connection
 - [ ] AWS CLI v2 installed
 - [ ] Team assignment (1-5)
 
@@ -32,7 +32,7 @@ Deploy a complete AppDynamics cluster in AWS with:
 This checks:
 - AWS CLI v2 installation
 - AWS credentials
-- Cisco VPN connection
+- VPN connection
 - Required tools (`expect`, `jq`, `ssh`)
 
 ---
@@ -57,7 +57,7 @@ Deploy VPC, VMs, Load Balancer, and DNS:
   - `controller-team1.splunkylabs.com`
   - `customer1-team1.auth.splunkylabs.com`
 - Security groups:
-  - SSH: Restricted to Cisco VPN IPs only
+  - SSH: Restricted to VPN IPs only
   - HTTPS: Open to all (0.0.0.0/0)
 
 **Deployment completes when you see:**
