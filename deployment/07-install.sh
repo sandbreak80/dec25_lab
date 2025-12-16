@@ -100,19 +100,48 @@ echo ""
 # Step 1: Verify cluster health
 log_info "Step 1: Verifying cluster health..."
 
-expect << EOF_EXPECT 2>&1 | tee "state/team${TEAM_NUMBER}/cluster-status.txt"
+CLUSTER_CHECK=$(expect << 'EOF_EXPECT'
 set timeout 30
-spawn ssh $SSH_OPTS appduser@$VM1_PUB "appdctl show cluster"
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "appdctl show cluster"
 expect {
-    "password:" { send "${PASSWORD}\r"; exp_continue }
+    "password:" { 
+        send "$env(PASSWORD)\r"
+        exp_continue 
+    }
+    -re "voter.*true" {
+        # Successfully got cluster status
+    }
+    "Connection refused" {
+        puts "ERROR: Connection refused"
+        exit 1
+    }
+    "Connection timed out" {
+        puts "ERROR: Connection timed out"
+        exit 1
+    }
+    timeout {
+        puts "ERROR: Command timeout"
+        exit 1
+    }
     eof
 }
 EOF_EXPECT
+)
 
-if [ ${PIPESTATUS[0]} -ne 0 ]; then
-    log_error "Cluster check failed"
+CLUSTER_CHECK_EXIT=$?
+echo "$CLUSTER_CHECK" | tee "state/team${TEAM_NUMBER}/cluster-status.txt"
+
+if [ $CLUSTER_CHECK_EXIT -ne 0 ]; then
+    log_error "Cluster check failed - cannot connect to VM1"
+    log_error "Verify VM is running and you can access it"
     exit 1
 fi
+
+if ! echo "$CLUSTER_CHECK" | grep -q "voter"; then
+    log_error "Cluster status check failed - unexpected output"
+    exit 1
+fi
+
 log_success "Cluster is healthy"
 echo ""
 
@@ -121,20 +150,55 @@ log_info "Step 2: Starting AppDynamics installation..."
 log_warning "This will take 20-30 minutes. Please be patient..."
 echo ""
 
-expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
+INSTALL_OUTPUT=$(expect << 'EOF_EXPECT' 2>&1
 set timeout 3600
-spawn ssh $SSH_OPTS appduser@$VM1_PUB "appdcli start all $PROFILE"
+log_user 1
+
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "appdcli start all $env(PROFILE)"
+
 expect {
-    "password:" { send "${PASSWORD}\r"; exp_continue }
-    eof
+    "password:" { 
+        send "$env(PASSWORD)\r"
+        exp_continue 
+    }
+    "Connection refused" {
+        puts "\nERROR: SSH connection refused"
+        exit 1
+    }
+    "Connection timed out" {
+        puts "\nERROR: SSH connection timed out"
+        exit 1
+    }
+    "Operation timed out" {
+        puts "\nERROR: SSH operation timed out"
+        exit 1
+    }
+    timeout {
+        puts "\nERROR: Installation command timeout (>60 minutes)"
+        exit 1
+    }
+    eof {
+        # Command completed
+    }
 }
 EOF_EXPECT
+)
 
-if [ ${PIPESTATUS[0]} -ne 0 ]; then
-    log_error "Installation command failed"
+INSTALL_EXIT=$?
+echo "$INSTALL_OUTPUT" | sed 's/^/  /'
+
+if [ $INSTALL_EXIT -ne 0 ]; then
+    log_error "Installation command failed (exit code: $INSTALL_EXIT)"
+    log_error "Check the output above for errors"
+    log_info ""
     log_info "You can manually complete the installation:"
     log_info "  ./scripts/ssh-vm1.sh --team $TEAM_NUMBER"
     log_info "  appdcli start all $PROFILE"
+    exit 1
+fi
+
+if echo "$INSTALL_OUTPUT" | grep -qi "ERROR\|Connection.*timed out\|Connection refused"; then
+    log_error "Installation command encountered errors"
     exit 1
 fi
 
@@ -145,33 +209,82 @@ echo ""
 log_info "Step 3: Waiting for services to start (checking every 60 seconds)..."
 echo ""
 
+SERVICES_READY=false
+
 for i in {1..30}; do
     sleep 60
+    echo ""
     echo "  Check $i/30..."
     
     # Use expect with password auth (no prompts!)
-    expect << EOF_CHECK 2>&1 | tee "state/team${TEAM_NUMBER}/service-status-check.txt"
+    PING_OUTPUT=$(expect << 'EOF_CHECK' 2>&1
 set timeout 30
-spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "appdcli ping"
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "appdcli ping"
 expect {
-    "password:" { send "${PASSWORD}\r"; exp_continue }
+    "password:" { 
+        send "$env(PASSWORD)\r"
+        exp_continue 
+    }
+    "Connection refused" {
+        puts "ERROR: Connection refused"
+        exit 1
+    }
+    "Connection timed out" {
+        puts "ERROR: Connection timed out"
+        exit 1
+    }
+    timeout {
+        puts "ERROR: Timeout"
+        exit 1
+    }
     eof
 }
 EOF_CHECK
+)
+    
+    PING_EXIT=$?
+    
+    if [ $PING_EXIT -ne 0 ]; then
+        log_error "Failed to check service status (cannot connect to VM)"
+        log_error "Deployment may have failed or VM is unreachable"
+        exit 1
+    fi
+    
+    echo "$PING_OUTPUT" | tee "state/team${TEAM_NUMBER}/service-status-check-${i}.txt"
     
     # Check if all services are up
-    if grep -q "Success" "state/team${TEAM_NUMBER}/service-status-check.txt" && \
-       ! grep -q "Progressing\|Failed\|Pending" "state/team${TEAM_NUMBER}/service-status-check.txt"; then
-        log_success "All services are up!"
-        break
+    if echo "$PING_OUTPUT" | grep -q "Success"; then
+        # Count how many services show Success
+        SUCCESS_COUNT=$(echo "$PING_OUTPUT" | grep -c "Success" || true)
+        FAILED_COUNT=$(echo "$PING_OUTPUT" | grep -c "Failed" || true)
+        
+        if [ $SUCCESS_COUNT -gt 5 ] && [ $FAILED_COUNT -eq 0 ]; then
+            log_success "All critical services are up!"
+            SERVICES_READY=true
+            break
+        else
+            echo "  Services starting... ($SUCCESS_COUNT ready, $FAILED_COUNT failed)"
+        fi
+    else
+        echo "  Services still initializing..."
     fi
     
     if [ $i -eq 30 ]; then
-        log_warning "Timeout waiting for services. Check manually:"
+        log_error "Services failed to start after 30 minutes"
+        log_error "Final status:"
+        echo "$PING_OUTPUT" | grep -E "Controller|Events|SecureApp" | sed 's/^/  /'
+        echo ""
+        log_info "Check manually:"
         log_info "  ./scripts/ssh-vm1.sh --team $TEAM_NUMBER"
         log_info "  appdcli ping"
+        exit 1
     fi
 done
+
+if [ "$SERVICES_READY" != "true" ]; then
+    log_error "Service verification failed"
+    exit 1
+fi
 
 echo ""
 echo ""

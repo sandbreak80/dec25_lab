@@ -4,6 +4,7 @@
 # Usage: ./deployment/full-deploy.sh --team TEAM_NUMBER [--skip-password-change] [--skip-ssh-keys]
 
 set -e  # Exit on error
+set -o pipefail  # Catch errors in pipes
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"

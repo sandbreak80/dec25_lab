@@ -104,15 +104,24 @@ check_bootstrap_complete() {
     log_info "Checking VM${VM_NUM} bootstrap status..."
     
     # Always use password auth (bootstrap may have modified SSH keys)
-    BOOT_STATUS=$(expect << EOF_EXPECT 2>/dev/null
+    BOOT_STATUS=$(expect << EOF_EXPECT 2>&1
 set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "ssh -o StrictHostKeyChecking=no appduser@${VM_IP} 'appdctl show boot'"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
 )
+    
+    BOOT_CHECK_EXIT=$?
+    if [ $BOOT_CHECK_EXIT -ne 0 ]; then
+        log_error "VM${VM_NUM} bootstrap check failed: cannot connect"
+        return 1
+    fi
     
     # Check if all bootstrap steps show "Succeeded"
     if echo "$BOOT_STATUS" | grep -q "STATUS" && ! echo "$BOOT_STATUS" | grep -E "(Failed|InProgress|Pending)" > /dev/null; then
@@ -146,10 +155,20 @@ set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "appdctl show boot"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
 )
+        
+        BOOT_CHECK_EXIT=$?
+        if [ $BOOT_CHECK_EXIT -ne 0 ]; then
+            log_error "VM1 bootstrap check failed: cannot connect"
+            ALL_READY=false
+            continue
+        fi
         
         if echo "$BOOT_STATUS" | grep -q "STATUS" && echo "$BOOT_STATUS" | grep -q "Succeeded" && ! echo "$BOOT_STATUS" | grep -E "(Failed|InProgress)" > /dev/null; then
             log_success "VM1 bootstrap: Complete"
@@ -369,10 +388,19 @@ set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "appdctl show cluster"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
 )
+
+CLUSTER_CHECK_EXIT=$?
+if [ $CLUSTER_CHECK_EXIT -ne 0 ]; then
+    log_error "Cannot retrieve cluster status - connection failed"
+    exit 1
+fi
 
 echo "$CLUSTER_OUTPUT" | sed 's/^/  /'
 
