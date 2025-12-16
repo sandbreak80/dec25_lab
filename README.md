@@ -2,6 +2,16 @@
 
 Complete automation for deploying AppDynamics Virtual Appliance in AWS for multi-team labs.
 
+## ✨ Key Features
+
+- **100% Automated** - All scripts use password authentication with `expect`, no manual intervention needed
+- **Password-Based Auth** - All deployment scripts work without SSH keys (AppDynamics123!)
+- **Bootstrap Monitoring** - Script 04 monitors bootstrap progress and waits for completion
+- **License Management** - Automated license upload to S3 and application to controllers
+- **Multi-Team Support** - Deploy up to 5 isolated lab environments simultaneously
+- **IAM Best Practices** - Includes student IAM policy with least-privilege access
+- **Full Cleanup** - One command tears down all resources for cost control
+
 ## 📋 Prerequisites
 
 ### Required Software
@@ -183,9 +193,9 @@ Before running `./lab-deploy.sh`, verify:
 
 ---
 
-## 🎯 Quick Start
+## 🎯 Lab Deployment
 
-Deploy a complete AppDynamics lab environment in ~40 minutes:
+Deploy your complete AppDynamics lab environment in ~40 minutes:
 
 ```bash
 # 1. Verify prerequisites
@@ -197,22 +207,27 @@ Deploy a complete AppDynamics lab environment in ~40 minutes:
 # 3. Change password (1 minute)
 ./deployment/02-change-password.sh --team 1
 
-# 4. Setup SSH keys (1 minute) - RECOMMENDED
-./deployment/03-setup-ssh-keys.sh --team 1
+# 4. Setup SSH keys (1 minute) - OPTIONAL
+# Note: All scripts work with password authentication (AppDynamics123!)
+# SSH keys are optional but provide better UX for manual SSH access
+./deployment/03-setup-ssh-keys.sh --team 1  # Optional
 
-# 5. Bootstrap VMs (5 minutes + 15-20 min wait)
+# 5. Bootstrap VMs (15-20 minutes - fully automated)
 ./deployment/04-bootstrap-vms.sh --team 1
 
-# 6. Create cluster (10 minutes)
+# 6. Create cluster (10 minutes - fully automated)
 ./deployment/05-create-cluster.sh --team 1
 
-# 7. Configure AppD (1 minute)
+# 7. Configure AppD (1 minute - fully automated)
 ./deployment/06-configure.sh --team 1
 
-# 8. Install AppDynamics (20-30 minutes)
+# 8. Install AppDynamics (20-30 minutes - fully automated)
 ./deployment/07-install.sh --team 1
 
-# 9. Verify deployment
+# 9. Apply License (1 minute - fully automated)
+./deployment/09-apply-license.sh --team 1
+
+# 10. Verify deployment (1 minute - fully automated)
 ./deployment/08-verify.sh --team 1
 ```
 
@@ -271,12 +286,13 @@ appd-virtual-appliance/deploy/aws/
 ├── deployment/                  # Deployment workflow scripts
 │   ├── 01-deploy.sh             # Deploy infrastructure
 │   ├── 02-change-password.sh    # Change VM password
-│   ├── 03-setup-ssh-keys.sh     # Setup SSH keys
-│   ├── 04-bootstrap-vms.sh      # Initialize VMs
+│   ├── 03-setup-ssh-keys.sh     # Setup SSH keys (optional)
+│   ├── 04-bootstrap-vms.sh      # Initialize VMs (monitors progress)
 │   ├── 05-create-cluster.sh     # Create K8s cluster
 │   ├── 06-configure.sh          # Configure AppD
 │   ├── 07-install.sh            # Install services
 │   ├── 08-verify.sh             # Verify deployment
+│   ├── 09-apply-license.sh      # Apply license from S3
 │   ├── cleanup.sh               # Delete all resources
 │   └── complete-build.sh        # End-to-end automation
 │
@@ -286,6 +302,9 @@ appd-virtual-appliance/deploy/aws/
 │   ├── create-vms.sh            # EC2 instances
 │   ├── create-alb.sh            # Load balancer
 │   ├── create-dns.sh            # Route 53 records
+│   ├── upload-license-to-s3.sh  # Upload license to S3
+│   ├── apply-license.sh         # Apply license to controller
+│   ├── check-bootstrap-progress.sh  # Monitor bootstrap status
 │   ├── check-prerequisites.sh   # Verify requirements
 │   ├── ssh-vm1.sh               # Quick SSH to VM1
 │   ├── ssh-vm2.sh               # Quick SSH to VM2
@@ -294,7 +313,11 @@ appd-virtual-appliance/deploy/aws/
 ├── docs/                        # Documentation
 │   ├── LAB_GUIDE.md             # Detailed lab guide
 │   ├── QUICK_REFERENCE.md       # Command reference
-│   ├── IAM_REQUIREMENTS.md      # IAM permissions
+│   ├── IAM_REQUIREMENTS.md      # IAM permissions (deprecated)
+│   ├── iam-student-policy.json  # Student IAM policy
+│   ├── LICENSE_MANAGEMENT.md    # License workflow guide
+│   ├── BOOTSTRAP_MONITORING.md  # Bootstrap monitoring guide
+│   ├── DEPLOYMENT_FLOW.md       # Complete deployment flow
 │   ├── PROJECT_STATUS.md        # Project status
 │   ├── FIX-REQUIRED.md          # Known issues
 │   └── instructor/              # Instructor resources

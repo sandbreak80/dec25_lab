@@ -38,17 +38,27 @@ log_success "Internet Gateway created: $IGW_ID"
 # Create Subnet 1 (AZ-a)
 log_info "[3/5] Creating Subnet 1 (${SUBNET_CIDR} in ${SUBNET_AZ})..."
 
-# Try to create subnet - use simpler command format
-SUBNET_ID=$(aws ec2 create-subnet --vpc-id "$VPC_ID" --cidr-block "$SUBNET_CIDR" --availability-zone "$SUBNET_AZ" --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$SUBNET_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" --query 'Subnet.SubnetId' --output text 2>/dev/null)
+# Check if subnet already exists first
+SUBNET_ID=$(get_resource_id subnet "$SUBNET_NAME")
 
-# If creation failed, try to find existing
+# If not found, try to create it
 if [[ -z "$SUBNET_ID" ]] || [[ "$SUBNET_ID" == "None" ]]; then
-    SUBNET_ID=$(get_resource_id subnet "$SUBNET_NAME")
+    log_info "Creating new subnet..."
+    SUBNET_ID=$(aws ec2 create-subnet --vpc-id "$VPC_ID" --cidr-block "$SUBNET_CIDR" --availability-zone "$SUBNET_AZ" --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$SUBNET_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" --query 'Subnet.SubnetId' --output text 2>&1 || true)
+    
+    # If still failed, try lookup again
+    if [[ -z "$SUBNET_ID" ]] || [[ "$SUBNET_ID" == *"error"* ]]; then
+        log_warning "Creation failed, looking up existing subnet..."
+        SUBNET_ID=$(get_resource_id subnet "$SUBNET_NAME")
+    fi
+else
+    log_info "Subnet already exists: $SUBNET_ID"
 fi
 
 # Validate we have a subnet ID
 if [[ -z "$SUBNET_ID" ]] || [[ "$SUBNET_ID" == "None" ]] || [[ ! "$SUBNET_ID" =~ ^subnet- ]]; then
     log_error "Failed to create or find Subnet 1"
+    log_error "SUBNET_ID value: '$SUBNET_ID'"
     exit 1
 fi
 
@@ -59,17 +69,27 @@ log_success "Subnet 1 created: $SUBNET_ID"
 # Create Subnet 2 (AZ-b) - Required for ALB
 log_info "[4/5] Creating Subnet 2 (${SUBNET2_CIDR} in ${SUBNET2_AZ})..."
 
-# Try to create subnet - use simpler command format
-SUBNET2_ID=$(aws ec2 create-subnet --vpc-id "$VPC_ID" --cidr-block "$SUBNET2_CIDR" --availability-zone "$SUBNET2_AZ" --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$SUBNET2_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" --query 'Subnet.SubnetId' --output text 2>/dev/null)
+# Check if subnet already exists first
+SUBNET2_ID=$(get_resource_id subnet "$SUBNET2_NAME")
 
-# If creation failed, try to find existing
+# If not found, try to create it
 if [[ -z "$SUBNET2_ID" ]] || [[ "$SUBNET2_ID" == "None" ]]; then
-    SUBNET2_ID=$(get_resource_id subnet "$SUBNET2_NAME")
+    log_info "Creating new subnet..."
+    SUBNET2_ID=$(aws ec2 create-subnet --vpc-id "$VPC_ID" --cidr-block "$SUBNET2_CIDR" --availability-zone "$SUBNET2_AZ" --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=$SUBNET2_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" --query 'Subnet.SubnetId' --output text 2>&1 || true)
+    
+    # If still failed, try lookup again
+    if [[ -z "$SUBNET2_ID" ]] || [[ "$SUBNET2_ID" == *"error"* ]]; then
+        log_warning "Creation failed, looking up existing subnet..."
+        SUBNET2_ID=$(get_resource_id subnet "$SUBNET2_NAME")
+    fi
+else
+    log_info "Subnet 2 already exists: $SUBNET2_ID"
 fi
 
 # Validate we have a subnet ID
 if [[ -z "$SUBNET2_ID" ]] || [[ "$SUBNET2_ID" == "None" ]] || [[ ! "$SUBNET2_ID" =~ ^subnet- ]]; then
     log_error "Failed to create or find Subnet 2"
+    log_error "SUBNET2_ID value: '$SUBNET2_ID'"
     exit 1
 fi
 

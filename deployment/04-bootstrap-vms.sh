@@ -101,13 +101,23 @@ bootstrap_vm_with_key() {
     
     log_info "[$VM_NUM/3] Bootstrapping VM${VM_NUM}: $VM_IP (using SSH key)"
     
-    # Check if bootstrap already completed
-    if ssh -i "${KEY_PATH}" \
+    # Check if bootstrap already completed (all tasks succeeded)
+    BOOT_CHECK=$(ssh -i "${KEY_PATH}" \
         -o StrictHostKeyChecking=no \
         -o UserKnownHostsFile=/dev/null \
         -o ConnectTimeout=5 \
         -o LogLevel=ERROR \
-        appduser@${VM_IP} "appdctl show boot | grep -q 'Succeeded'" 2>/dev/null; then
+        appduser@${VM_IP} "appdctl show boot 2>&1" 2>/dev/null || true)
+    
+    # If socket error, bootstrap is still in progress
+    if echo "$BOOT_CHECK" | grep -q "Socket.*not found"; then
+        log_warning "VM${VM_NUM} bootstrap in progress (will verify at end)..."
+        echo ""
+        return 0
+    fi
+    
+    # If all succeeded, skip
+    if echo "$BOOT_CHECK" | grep -q "Succeeded" && ! echo "$BOOT_CHECK" | grep -q "Socket.*not found"; then
         log_warning "VM${VM_NUM} already bootstrapped, skipping..."
         echo ""
         return 0
@@ -163,12 +173,28 @@ if [ $BOOTSTRAP_STATUS -eq 0 ]; then
     sleep 10
     
     echo ""
+    echo "Configuring passwordless sudo for cluster operations..."
+    echo "appduser ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/appduser > /dev/null
+    sudo chmod 440 /etc/sudoers.d/appduser
+    echo "✅ Passwordless sudo configured"
+    
+    echo ""
     echo "Verifying bootstrap status:"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    sudo -u appduser appdctl show boot || true
+    BOOT_OUTPUT=$(sudo -u appduser appdctl show boot 2>&1 || true)
+    echo "$BOOT_OUTPUT"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
-    echo "✅ VM bootstrap successful!"
+    
+    # Check if bootstrap is actually complete (not just in progress)
+    if echo "$BOOT_OUTPUT" | grep -q "Socket.*not found"; then
+        echo "⏳ Bootstrap still in progress (extracting images)"
+        echo "   Will verify completion at end of script"
+        # Exit with 0 so script continues to other VMs
+        exit 0
+    else
+        echo "✅ VM bootstrap successful!"
+    fi
 else
     echo ""
     echo "❌ Bootstrap command failed with exit code: $BOOTSTRAP_STATUS"
@@ -316,11 +342,166 @@ echo ""
 log_info "Running final verification on all VMs..."
 echo ""
 
+BOOTSTRAP_FAILED=false
 for i in 1 2 3; do
     VM_IP_VAR="VM${i}_IP"
     VM_IP="${!VM_IP_VAR}"
     
     echo "VM${i} Status:"
+    
+    BOOT_OUTPUT=""
+    if [[ "$SSH_METHOD" == "key" ]]; then
+        BOOT_OUTPUT=$(ssh -i "${KEY_PATH}" \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            -o ConnectTimeout=10 \
+            appduser@${VM_IP} "appdctl show boot" 2>&1 || true)
+    else
+        BOOT_OUTPUT=$(expect << EOF_EXPECT 2>&1
+set timeout 10
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "appdctl show boot"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+)
+    fi
+    
+    echo "$BOOT_OUTPUT" | sed 's/^/  /'
+    
+    # Check if bootstrap actually succeeded
+    if echo "$BOOT_OUTPUT" | grep -q "Socket /var/run/appd-os.sock not found"; then
+        log_warning "VM${i} bootstrap still in progress (extracting images, this takes 20-30 minutes)"
+        BOOTSTRAP_FAILED=true
+    elif echo "$BOOT_OUTPUT" | grep -q "Succeeded"; then
+        log_success "VM${i} bootstrap COMPLETE"
+    else
+        log_error "VM${i} bootstrap status unknown"
+        BOOTSTRAP_FAILED=true
+    fi
+    echo ""
+done
+
+if [ "$BOOTSTRAP_FAILED" = true ]; then
+    echo ""
+    log_warning "⏱️  Bootstrap is still in progress!"
+    echo ""
+    echo "The bootstrap process extracts multi-GB image files and typically takes 20-30 minutes."
+    echo "Waiting for bootstrap to complete..."
+    echo ""
+    
+    # Monitor bootstrap progress until complete
+    MAX_WAIT_MINUTES=45
+    CHECK_INTERVAL=30
+    ELAPSED_SECONDS=0
+    MAX_WAIT_SECONDS=$((MAX_WAIT_MINUTES * 60))
+    
+    while [ $ELAPSED_SECONDS -lt $MAX_WAIT_SECONDS ]; do
+        sleep $CHECK_INTERVAL
+        ELAPSED_SECONDS=$((ELAPSED_SECONDS + CHECK_INTERVAL))
+        ELAPSED_MINUTES=$((ELAPSED_SECONDS / 60))
+        
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "⏱️  Checking progress (${ELAPSED_MINUTES}m elapsed)..."
+        echo ""
+        
+        ALL_COMPLETE=true
+        for i in 1 2 3; do
+            VM_IP_VAR="VM${i}_IP"
+            VM_IP="${!VM_IP_VAR}"
+            
+            # Quick status check
+            BOOT_CHECK=""
+            if [[ "$SSH_METHOD" == "key" ]]; then
+                BOOT_CHECK=$(ssh -i "${KEY_PATH}" \
+                    -o StrictHostKeyChecking=no \
+                    -o UserKnownHostsFile=/dev/null \
+                    -o LogLevel=ERROR \
+                    -o ConnectTimeout=10 \
+                    appduser@${VM_IP} "appdctl show boot 2>&1 | head -5" 2>&1 || true)
+            else
+                BOOT_CHECK=$(expect << EOF_EXPECT 2>&1
+set timeout 15
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "appdctl show boot 2>&1 | head -5"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    timeout { puts "timeout"; exit 1 }
+    eof
+}
+EOF_EXPECT
+)
+            fi
+            
+            if echo "$BOOT_CHECK" | grep -q "Succeeded"; then
+                echo "  VM${i}: ✅ Complete"
+            elif echo "$BOOT_CHECK" | grep -q "Socket.*not found"; then
+                echo "  VM${i}: ⏳ Still extracting images..."
+                ALL_COMPLETE=false
+                
+                # Show what's being extracted
+                if [[ "$SSH_METHOD" == "key" ]]; then
+                    EXTRACT_INFO=$(ssh -i "${KEY_PATH}" \
+                        -o StrictHostKeyChecking=no \
+                        -o UserKnownHostsFile=/dev/null \
+                        -o LogLevel=ERROR \
+                        -o ConnectTimeout=10 \
+                        appduser@${VM_IP} "echo '${PASSWORD}' | sudo -S ps aux 2>/dev/null | grep 'unxz' | grep -v grep | awk '{print \$10, \$NF}'" 2>&1 | grep -v password | head -2 || true)
+                    
+                    if [[ -n "$EXTRACT_INFO" ]]; then
+                        while IFS= read -r line; do
+                            if echo "$line" | grep -q "infra-images"; then
+                                ELAPSED=$(echo "$line" | awk '{print $1}')
+                                echo "         - infra-images (${ELAPSED})"
+                            elif echo "$line" | grep -q "aiops-images"; then
+                                ELAPSED=$(echo "$line" | awk '{print $1}')
+                                echo "         - aiops-images (${ELAPSED})"
+                            fi
+                        done <<< "$EXTRACT_INFO"
+                    fi
+                fi
+            else
+                echo "  VM${i}: ⚠️  Unknown status"
+                ALL_COMPLETE=false
+            fi
+        done
+        
+        echo ""
+        
+        if [ "$ALL_COMPLETE" = true ]; then
+            echo "🎉 All VMs have completed bootstrapping!"
+            break
+        fi
+        
+        REMAINING_MINUTES=$(( (MAX_WAIT_SECONDS - ELAPSED_SECONDS) / 60 ))
+        echo "Waiting ${CHECK_INTERVAL}s before next check (timeout in ${REMAINING_MINUTES}m)..."
+        echo ""
+    done
+    
+    # Final verification after monitoring loop
+    if [ "$ALL_COMPLETE" != true ]; then
+        echo ""
+        log_error "Bootstrap did not complete within ${MAX_WAIT_MINUTES} minutes"
+        log_info "Check status manually with:"
+        echo "  ./scripts/check-bootstrap-progress.sh --team ${TEAM_NUMBER}"
+        echo ""
+        exit 1
+    fi
+fi
+
+# Show final status
+echo ""
+echo "╔══════════════════════════════════════════════════════════╗"
+echo "║  Final Bootstrap Verification                           ║"
+echo "╚══════════════════════════════════════════════════════════╝"
+echo ""
+
+for i in 1 2 3; do
+    VM_IP_VAR="VM${i}_IP"
+    VM_IP="${!VM_IP_VAR}"
+    
+    echo "VM${i} (${VM_IP}):"
     if [[ "$SSH_METHOD" == "key" ]]; then
         ssh -i "${KEY_PATH}" \
             -o StrictHostKeyChecking=no \
@@ -328,7 +509,7 @@ for i in 1 2 3; do
             -o LogLevel=ERROR \
             appduser@${VM_IP} "appdctl show boot" 2>&1 | sed 's/^/  /'
     else
-        expect << EOF_EXPECT
+        expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
 set timeout 10
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "appdctl show boot"
 expect {

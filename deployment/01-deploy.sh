@@ -129,7 +129,7 @@ echo ""
 
 if ! is_step_complete "vpc-created" "$TEAM_NUMBER"; then
     log_info "Creating VPC and network infrastructure..."
-    ../scripts/create-network.sh --team "$TEAM_NUMBER"
+    "${SCRIPT_DIR}/../scripts/create-network.sh" --team "$TEAM_NUMBER"
     mark_step_complete "vpc-created" "$TEAM_NUMBER"
 else
     log_success "Network infrastructure already exists"
@@ -146,7 +146,7 @@ echo ""
 
 if ! is_step_complete "security-created" "$TEAM_NUMBER"; then
     log_info "Creating security groups..."
-    ../scripts/create-security.sh --team "$TEAM_NUMBER"
+    "${SCRIPT_DIR}/../scripts/create-security.sh" --team "$TEAM_NUMBER"
     mark_step_complete "security-created" "$TEAM_NUMBER"
 else
     log_success "Security groups already exist"
@@ -164,7 +164,7 @@ echo ""
 if ! is_step_complete "vms-created" "$TEAM_NUMBER"; then
     log_info "Deploying 3 EC2 instances..."
     log_info "This takes ~5 minutes..."
-    ../scripts/create-vms.sh --team "$TEAM_NUMBER"
+    "${SCRIPT_DIR}/../scripts/create-vms.sh" --team "$TEAM_NUMBER"
     mark_step_complete "vms-created" "$TEAM_NUMBER"
 else
     log_success "VMs already deployed"
@@ -182,7 +182,7 @@ echo ""
 if ! is_step_complete "alb-created" "$TEAM_NUMBER"; then
     log_info "Creating Application Load Balancer with SSL..."
     log_info "This takes ~3 minutes..."
-    ../scripts/create-alb.sh --team "$TEAM_NUMBER"
+    "${SCRIPT_DIR}/../scripts/create-alb.sh" --team "$TEAM_NUMBER"
     mark_step_complete "alb-created" "$TEAM_NUMBER"
 else
     log_success "ALB already configured"
@@ -199,7 +199,7 @@ echo ""
 
 if ! is_step_complete "dns-created" "$TEAM_NUMBER"; then
     log_info "Configuring DNS records..."
-    ../scripts/create-dns.sh --team "$TEAM_NUMBER"
+    "${SCRIPT_DIR}/../scripts/create-dns.sh" --team "$TEAM_NUMBER"
     mark_step_complete "dns-created" "$TEAM_NUMBER"
 else
     log_success "DNS already configured"
@@ -215,7 +215,7 @@ EOF
 echo ""
 
 log_info "Verifying deployment..."
-../scripts/verify-deployment.sh --team "$TEAM_NUMBER"
+"${SCRIPT_DIR}/../scripts/verify-deployment.sh" --team "$TEAM_NUMBER"
 echo ""
 
 # Success!

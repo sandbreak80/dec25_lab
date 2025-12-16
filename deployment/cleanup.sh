@@ -101,7 +101,7 @@ echo ""
 
 # Phase 1: DNS
 log_info "[1/8] Removing DNS records..."
-./scripts/delete-dns.sh --team "$TEAM_NUMBER" 2>/dev/null || log_warning "DNS cleanup skipped"
+"${SCRIPT_DIR}/../scripts/delete-dns.sh" --team "$TEAM_NUMBER" 2>/dev/null || log_warning "DNS cleanup skipped"
 
 # Phase 2: ALB Listeners
 log_info "[2/8] Deleting ALB listeners..."
@@ -142,15 +142,32 @@ for id in $VM1_ID $VM2_ID $VM3_ID; do
 done
 
 if [ -n "$INSTANCE_IDS" ]; then
+    # Release Elastic IPs before terminating instances
+    for instance_id in $INSTANCE_IDS; do
+        EIP_ALLOC_ID=$(aws ec2 describe-addresses --filters "Name=instance-id,Values=$instance_id" --query 'Addresses[0].AllocationId' --output text 2>/dev/null)
+        if [ -n "$EIP_ALLOC_ID" ] && [ "$EIP_ALLOC_ID" != "None" ]; then
+            aws ec2 release-address --allocation-id "$EIP_ALLOC_ID" 2>/dev/null || true
+        fi
+    done
+    
     aws ec2 terminate-instances --instance-ids $INSTANCE_IDS >/dev/null 2>&1 || true
     log_info "Waiting for instances to terminate..."
     aws ec2 wait instance-terminated --instance-ids $INSTANCE_IDS 2>/dev/null || sleep 60
-    log_success "Instances terminated"
+    log_success "Instances and Elastic IPs deleted"
 fi
 
-# Phase 6: Security Groups
-log_info "[6/8] Deleting Security Groups..."
-sleep 30  # Wait for dependencies
+# Phase 6: Network Interfaces (ENI)
+log_info "[6/8] Deleting network interfaces..."
+sleep 10  # Wait for instances to fully terminate
+VPC_ID=$(load_resource_id vpc "$TEAM_NUMBER")
+if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
+    aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=$VPC_ID" --query 'NetworkInterfaces[*].NetworkInterfaceId' --output text 2>/dev/null | xargs -r -n1 aws ec2 delete-network-interface --network-interface-id 2>/dev/null || true
+    log_success "Network interfaces deleted"
+fi
+
+# Phase 7: Security Groups
+log_info "[7/8] Deleting Security Groups..."
+sleep 20  # Wait for dependencies
 VM_SG_ID=$(load_resource_id vm-sg "$TEAM_NUMBER")
 ALB_SG_ID=$(load_resource_id alb-sg "$TEAM_NUMBER")
 
@@ -161,8 +178,8 @@ for sg in $ALB_SG_ID $VM_SG_ID; do
 done
 log_success "Security Groups deleted"
 
-# Phase 7: Network Infrastructure
-log_info "[7/8] Deleting network infrastructure..."
+# Phase 8: Network Infrastructure
+log_info "[8/9] Deleting network infrastructure..."
 VPC_ID=$(load_resource_id vpc "$TEAM_NUMBER")
 
 if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
@@ -184,8 +201,8 @@ if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
     log_success "Network infrastructure deleted"
 fi
 
-# Phase 8: Cleanup state
-log_info "[8/8] Cleaning up state files..."
+# Phase 9: Cleanup state
+log_info "[9/9] Cleaning up state files..."
 rm -rf "state/team${TEAM_NUMBER}"
 rm -rf "logs/team${TEAM_NUMBER}"
 log_success "State cleaned"

@@ -6,6 +6,15 @@
 .aws/
 aws-credentials.txt
 secrets.yaml
+lab-student-credentials.json
+STUDENT_CREDENTIALS.txt
+*accessKeys*.csv
+*_accessKeys*.csv
+credentials*.csv
+
+# AppDynamics License - NEVER COMMIT!
+license.lic
+*.lic
 
 # Deployment State
 state/

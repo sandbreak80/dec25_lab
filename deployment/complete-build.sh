@@ -77,19 +77,19 @@ sleep 5
 # Step 1: Infrastructure
 log_info "=== STEP 1/7: Deploying Infrastructure ==="
 echo ""
-../scripts/create-network.sh --team "$TEAM_NUMBER"
-../scripts/create-security.sh --team "$TEAM_NUMBER"
-../scripts/create-vms.sh --team "$TEAM_NUMBER"
-../scripts/create-alb.sh --team "$TEAM_NUMBER"
+"${SCRIPT_DIR}/../scripts/create-network.sh" --team "$TEAM_NUMBER"
+"${SCRIPT_DIR}/../scripts/create-security.sh" --team "$TEAM_NUMBER"
+"${SCRIPT_DIR}/../scripts/create-vms.sh" --team "$TEAM_NUMBER"
+"${SCRIPT_DIR}/../scripts/create-alb.sh" --team "$TEAM_NUMBER"
 
 # Fix ALB DNS for DNS script
 ALB_DNS=$(aws elbv2 describe-load-balancers \
     --names "appd-team${TEAM_NUMBER}-alb" \
     --query 'LoadBalancers[0].DNSName' \
     --output text 2>/dev/null)
-echo "$ALB_DNS" > "../state/team${TEAM_NUMBER}/alb-dns.txt"
+echo "$ALB_DNS" > "${SCRIPT_DIR}/../state/team${TEAM_NUMBER}/alb-dns.txt"
 
-../scripts/create-dns.sh --team "$TEAM_NUMBER"
+"${SCRIPT_DIR}/../scripts/create-dns.sh" --team "$TEAM_NUMBER"
 
 log_success "Infrastructure deployed!"
 echo ""
@@ -162,13 +162,13 @@ Team ${TEAM_NUMBER} is fully deployed and ready!
 
 📝 Next Steps:
    1. Configure cluster:
-      ./06-configure.sh --team ${TEAM_NUMBER}
+      ./deployment/06-configure.sh --team ${TEAM_NUMBER}
    
    2. Install AppDynamics:
-      ./07-install.sh --team ${TEAM_NUMBER}
+      ./deployment/07-install.sh --team ${TEAM_NUMBER}
 
 🔍 Check Status:
-   ../scripts/check-status.sh --team ${TEAM_NUMBER}
+   ./scripts/check-status.sh --team ${TEAM_NUMBER}
 
 Happy Learning! 🎓
 
