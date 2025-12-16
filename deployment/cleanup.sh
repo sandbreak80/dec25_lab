@@ -110,14 +110,14 @@ log_info "[1/10] Removing DNS records..."
 log_info "[2/10] Deleting ALB listeners..."
 ALB_ARN=$(load_resource_id alb "$TEAM_NUMBER")
 if [ -n "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
-    aws elbv2 describe-listeners --load-balancer-arn "$ALB_ARN" --query 'Listeners[*].ListenerArn' --output text 2>/dev/null | xargs -r -n1 aws elbv2 delete-listener --listener-arn || true
+    aws elbv2 describe-listeners --load-balancer-arn "$ALB_ARN" --query 'Listeners[*].ListenerArn' --output text 2>/dev/null | xargs -r -n1 aws elbv2 delete-listener --listener-arn >/dev/null 2>&1 || true
     log_success "Listeners deleted"
 fi
 
 # Phase 3: ALB
 log_info "[3/10] Deleting Application Load Balancer..."
 if [ -n "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
-    aws elbv2 delete-load-balancer --load-balancer-arn "$ALB_ARN" 2>/dev/null || true
+    aws elbv2 delete-load-balancer --load-balancer-arn "$ALB_ARN" >/dev/null 2>&1 || true
     log_info "Waiting for ALB deletion..."
     sleep 30
     log_success "ALB deleted"
@@ -127,7 +127,7 @@ fi
 log_info "[4/10] Deleting Target Groups..."
 TG_ARN=$(load_resource_id tg "$TEAM_NUMBER")
 if [ -n "$TG_ARN" ] && [ "$TG_ARN" != "None" ]; then
-    aws elbv2 delete-target-group --target-group-arn "$TG_ARN" 2>/dev/null || true
+    aws elbv2 delete-target-group --target-group-arn "$TG_ARN" >/dev/null 2>&1 || true
     log_success "Target Group deleted"
 fi
 
@@ -149,7 +149,8 @@ if [ -n "$INSTANCE_IDS" ]; then
     for instance_id in $INSTANCE_IDS; do
         EIP_ALLOC_ID=$(aws ec2 describe-addresses --filters "Name=instance-id,Values=$instance_id" --query 'Addresses[0].AllocationId' --output text 2>/dev/null)
         if [ -n "$EIP_ALLOC_ID" ] && [ "$EIP_ALLOC_ID" != "None" ]; then
-            aws ec2 release-address --allocation-id "$EIP_ALLOC_ID" 2>/dev/null || true
+            log_info "  Releasing EIP: $EIP_ALLOC_ID"
+            aws ec2 release-address --allocation-id "$EIP_ALLOC_ID" >/dev/null 2>&1 || true
         fi
     done
     
@@ -196,16 +197,17 @@ ALB_SG_ID=$(load_resource_id alb-sg "$TEAM_NUMBER")
 # First revoke all ingress/egress rules to remove dependencies
 for sg in $ALB_SG_ID $VM_SG_ID; do
     if [ -n "$sg" ] && [ "$sg" != "None" ]; then
+        log_info "  Revoking rules for SG: $sg"
         # Revoke ingress rules
         aws ec2 describe-security-groups --group-ids "$sg" --query 'SecurityGroups[0].IpPermissions' --output json 2>/dev/null | \
             jq -c '.[]' 2>/dev/null | while read rule; do
-                aws ec2 revoke-security-group-ingress --group-id "$sg" --ip-permissions "$rule" 2>/dev/null || true
+                aws ec2 revoke-security-group-ingress --group-id "$sg" --ip-permissions "$rule" >/dev/null 2>&1 || true
             done
         
         # Revoke egress rules
         aws ec2 describe-security-groups --group-ids "$sg" --query 'SecurityGroups[0].IpPermissionsEgress' --output json 2>/dev/null | \
             jq -c '.[]' 2>/dev/null | while read rule; do
-                aws ec2 revoke-security-group-egress --group-id "$sg" --ip-permissions "$rule" 2>/dev/null || true
+                aws ec2 revoke-security-group-egress --group-id "$sg" --ip-permissions "$rule" >/dev/null 2>&1 || true
             done
     fi
 done
@@ -213,7 +215,8 @@ done
 # Now delete security groups
 for sg in $ALB_SG_ID $VM_SG_ID; do
     if [ -n "$sg" ] && [ "$sg" != "None" ]; then
-        aws ec2 delete-security-group --group-id "$sg" 2>/dev/null || true
+        log_info "  Deleting SG: $sg"
+        aws ec2 delete-security-group --group-id "$sg" >/dev/null 2>&1 || true
     fi
 done
 log_success "Security Groups deleted"
@@ -224,43 +227,43 @@ VPC_ID=$(load_resource_id vpc "$TEAM_NUMBER")
 
 if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
     # Disassociate and delete route tables (except main)
-    log_info "Disassociating route tables..."
+    log_info "  Disassociating route tables..."
     aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" \
         --query 'RouteTables[?Associations[0].Main!=`true`].Associations[].RouteTableAssociationId' \
-        --output text 2>/dev/null | xargs -r -n1 aws ec2 disassociate-route-table --association-id 2>/dev/null || true
+        --output text 2>/dev/null | xargs -r -n1 aws ec2 disassociate-route-table --association-id >/dev/null 2>&1 || true
     
     # Delete subnets
-    log_info "Deleting subnets..."
-    aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query 'Subnets[*].SubnetId' --output text | xargs -r -n1 aws ec2 delete-subnet --subnet-id || true
+    log_info "  Deleting subnets..."
+    aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query 'Subnets[*].SubnetId' --output text 2>/dev/null | xargs -r -n1 aws ec2 delete-subnet --subnet-id >/dev/null 2>&1 || true
     
     # Detach and delete IGW
-    log_info "Deleting Internet Gateway..."
-    IGW_ID=$(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$VPC_ID" --query 'InternetGateways[0].InternetGatewayId' --output text)
+    log_info "  Deleting Internet Gateway..."
+    IGW_ID=$(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$VPC_ID" --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null)
     if [ -n "$IGW_ID" ] && [ "$IGW_ID" != "None" ]; then
-        aws ec2 detach-internet-gateway --internet-gateway-id "$IGW_ID" --vpc-id "$VPC_ID" 2>/dev/null || true
+        aws ec2 detach-internet-gateway --internet-gateway-id "$IGW_ID" --vpc-id "$VPC_ID" >/dev/null 2>&1 || true
         sleep 5  # Wait for detachment
-        aws ec2 delete-internet-gateway --internet-gateway-id "$IGW_ID" 2>/dev/null || true
+        aws ec2 delete-internet-gateway --internet-gateway-id "$IGW_ID" >/dev/null 2>&1 || true
     fi
     
     # Delete route tables (except main)
-    log_info "Deleting route tables..."
-    aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" --query 'RouteTables[?Associations[0].Main!=`true`].RouteTableId' --output text | xargs -r -n1 aws ec2 delete-route-table --route-table-id || true
+    log_info "  Deleting route tables..."
+    aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" --query 'RouteTables[?Associations[0].Main!=`true`].RouteTableId' --output text 2>/dev/null | xargs -r -n1 aws ec2 delete-route-table --route-table-id >/dev/null 2>&1 || true
     
     # Delete VPC with retries
-    log_info "Deleting VPC..."
+    log_info "  Deleting VPC..."
     MAX_RETRIES=10
     RETRY_COUNT=0
     VPC_DELETED=false
     
     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-        if aws ec2 delete-vpc --vpc-id "$VPC_ID" 2>/dev/null; then
+        if aws ec2 delete-vpc --vpc-id "$VPC_ID" >/dev/null 2>&1; then
             VPC_DELETED=true
-            log_success "VPC deleted"
+            log_success "  VPC deleted"
             break
         else
             RETRY_COUNT=$((RETRY_COUNT + 1))
             if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-                log_info "VPC has dependencies, retrying in 10 seconds... (attempt $RETRY_COUNT/$MAX_RETRIES)"
+                log_info "  VPC has dependencies, retrying... (attempt $RETRY_COUNT/$MAX_RETRIES)"
                 sleep 10
             fi
         fi
