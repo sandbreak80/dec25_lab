@@ -85,7 +85,7 @@ VM1_PUB=$(cat "state/team${TEAM_NUMBER}/vm1-public-ip.txt")
 if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
     PASSWORD="AppDynamics123!"
 else
-    PASSWORD="appduser"
+    PASSWORD="changeme"
 fi
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 log_info "Using password authentication (AppDynamics modifies keys during bootstrap)"

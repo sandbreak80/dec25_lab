@@ -69,7 +69,7 @@ if [ "$PASSWORD" = "AppDynamics123!" ]; then
     if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
         PASSWORD="AppDynamics123!"
     else
-        PASSWORD="appduser"
+        PASSWORD="changeme"
     fi
 fi
 

@@ -59,7 +59,7 @@ check_aws_cli
 if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
     PASSWORD="AppDynamics123!"
 else
-    PASSWORD="appduser"
+    PASSWORD="changeme"
 fi
 
 # Check if SSH key is configured (for informational purposes only)

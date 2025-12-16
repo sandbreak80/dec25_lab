@@ -62,8 +62,8 @@ if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
     PASSWORD="AppDynamics123!"
     log_info "Using changed password (AppDynamics123!)"
 else
-    PASSWORD="appduser"
-    log_info "Using default password (appduser - password change was skipped)"
+    PASSWORD="changeme"
+    log_info "Using default password (changeme - password change was skipped)"
 fi
 export PASSWORD
 
