@@ -264,23 +264,16 @@ echo ""
 
 # Get VM1's public key (generated during bootstrap)
 log_info "Retrieving VM1's SSH public key..."
-if [[ "$SSH_METHOD" == "key" ]]; then
-    VM1_PUB_KEY=$(ssh -i "${KEY_PATH}" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o LogLevel=ERROR \
-        appduser@${VM1_IP} "cat ~/.ssh/id_rsa.pub" 2>/dev/null)
-else
-    VM1_PUB_KEY=$(expect << EOF_EXPECT 2>/dev/null
-set timeout 10
-spawn ssh -o StrictHostKeyChecking=no appduser@${VM1_IP} "cat ~/.ssh/id_rsa.pub"
+# Always use password auth (bootstrap may have modified SSH keys)
+VM1_PUB_KEY=$(expect << EOF_EXPECT 2>/dev/null
+set timeout 15
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_IP} "test -f ~/.ssh/id_ed25519.pub && cat ~/.ssh/id_ed25519.pub || (test -f ~/.ssh/id_rsa.pub && cat ~/.ssh/id_rsa.pub)"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
     eof
 }
 EOF_EXPECT
 )
-fi
 
 if [[ -z "$VM1_PUB_KEY" ]]; then
     log_error "Failed to retrieve VM1's public key"
@@ -296,47 +289,15 @@ install_key_safely() {
     
     log_info "Installing VM1's key on ${TARGET_NAME}..."
     
-    if [[ "$SSH_METHOD" == "key" ]]; then
-        # Use a safe script that checks if key exists before adding
-        ssh -i "${KEY_PATH}" \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o LogLevel=ERROR \
-            appduser@${TARGET_IP} "
-                # Ensure .ssh directory exists with correct permissions
-                mkdir -p ~/.ssh
-                chmod 700 ~/.ssh
-                
-                # Check if key already exists
-                if grep -q \"${VM1_PUB_KEY}\" ~/.ssh/authorized_keys 2>/dev/null; then
-                    echo 'Key already present'
-                else
-                    # Add key safely
-                    echo '${VM1_PUB_KEY}' >> ~/.ssh/authorized_keys
-                    chmod 600 ~/.ssh/authorized_keys
-                    echo 'Key added'
-                fi
-            " 2>&1 | sed 's/^/    /'
-    else
-        expect << EOF_EXPECT 2>&1 | sed 's/^/    /'
-set timeout 10
-spawn ssh -o StrictHostKeyChecking=no appduser@${TARGET_IP} "
-    mkdir -p ~/.ssh
-    chmod 700 ~/.ssh
-    if grep -q \\\"${VM1_PUB_KEY}\\\" ~/.ssh/authorized_keys 2>/dev/null; then
-        echo 'Key already present'
-    else
-        echo '${VM1_PUB_KEY}' >> ~/.ssh/authorized_keys
-        chmod 600 ~/.ssh/authorized_keys
-        echo 'Key added'
-    fi
-"
+    # Always use password auth (bootstrap may have modified SSH keys)
+    expect << EOF_EXPECT 2>&1 | sed 's/^/    /'
+set timeout 15
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${TARGET_IP} "mkdir -p ~/.ssh && chmod 700 ~/.ssh && (grep -q '${VM1_PUB_KEY}' ~/.ssh/authorized_keys 2>/dev/null && echo 'Key already present' || (echo '${VM1_PUB_KEY}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && echo 'Key added'))"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
     eof
 }
 EOF_EXPECT
-    fi
     
     log_success "${TARGET_NAME}: VM1 key installed"
 }
