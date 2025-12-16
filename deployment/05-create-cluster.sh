@@ -252,14 +252,17 @@ log_user 1
 
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "cd /home/appduser && appdctl cluster init $VM2_PRIV $VM3_PRIV"
 
+set success 0
 expect {
     "password:" {
         send "${PASSWORD}\r"
         exp_continue
     }
     "Successfully created a multi node cluster" {
+        set success 1
         puts ""
         puts "✅ Cluster creation successful!"
+        exp_continue
     }
     timeout {
         puts ""
@@ -267,6 +270,12 @@ expect {
         exit 1
     }
     eof
+}
+
+if {$success == 0} {
+    puts ""
+    puts "❌ Cluster creation failed - success message not found"
+    exit 1
 }
 EOF_EXPECT
 
