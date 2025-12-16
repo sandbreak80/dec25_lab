@@ -195,39 +195,7 @@ Before running `./lab-deploy.sh`, verify:
 
 ## 🎯 Lab Deployment
 
-### Option 1: Full Automated Deployment (Recommended for Testing)
-
-**Non-interactive end-to-end deployment** - Perfect for CI/CD or testing full deployments:
-
-```bash
-# Deploy everything in one command (70-80 minutes, fully automated)
-./deployment/full-deploy.sh --team 5
-
-# Skip password change for faster testing (uses default: AppDynamics123!)
-./deployment/full-deploy.sh --team 5 --skip-password-change
-
-# Skip SSH keys (password auth only)
-./deployment/full-deploy.sh --team 5 --skip-password-change --skip-ssh-keys
-```
-
-**Features:**
-- ✅ **100% Non-Interactive** - No prompts, runs start to finish
-- ✅ **Progress Tracking** - Shows current step and timing
-- ✅ **Comprehensive Logging** - All output saved to `logs/full-deploy/`
-- ✅ **Error Handling** - Stops on failure, shows summary at end
-- ✅ **Perfect for Testing** - Validate full deployment before labs
-
-**Use Cases:**
-- End-to-end deployment validation
-- CI/CD pipeline integration
-- Overnight/unattended deployments
-- Lab environment testing
-
----
-
-### Option 2: Step-by-Step Deployment (Recommended for Learning)
-
-Deploy your complete AppDynamics lab environment in ~40 minutes with control at each step:
+Deploy your complete AppDynamics lab environment in ~40 minutes:
 
 ```bash
 # 1. Verify prerequisites
