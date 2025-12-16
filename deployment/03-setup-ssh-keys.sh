@@ -94,16 +94,26 @@ KEY_PATH="${HOME}/.ssh/${KEY_NAME}"
 # Step 1: Generate SSH key if it doesn't exist
 if [[ -f "${KEY_PATH}" ]]; then
     log_warning "SSH key already exists: ${KEY_PATH}"
-    read -p "Overwrite? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Using existing key"
+    
+    # Check if running non-interactively (e.g., from full-deploy.sh)
+    if [ -t 0 ]; then
+        # Interactive mode - ask user
+        read -p "Overwrite? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            log_info "Using existing key"
+        else
+            log_info "Generating new SSH key pair..."
+            rm -f "${KEY_PATH}" "${KEY_PATH}.pub"
+            ssh-keygen -t ed25519 -f "${KEY_PATH}" -N "" -C "appd-lab-team${TEAM_NUMBER}"
+        fi
     else
-        log_info "Generating new SSH key pair..."
+        # Non-interactive mode - overwrite automatically
+        log_info "Non-interactive mode: Overwriting existing key..."
         rm -f "${KEY_PATH}" "${KEY_PATH}.pub"
         ssh-keygen -t ed25519 -f "${KEY_PATH}" -N "" -C "appd-lab-team${TEAM_NUMBER}"
-        log_success "SSH key generated: ${KEY_PATH}"
     fi
+    log_success "SSH key ready: ${KEY_PATH}"
 else
     log_info "Generating SSH key pair..."
     ssh-keygen -t ed25519 -f "${KEY_PATH}" -N "" -C "appd-lab-team${TEAM_NUMBER}"
