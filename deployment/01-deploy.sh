@@ -105,9 +105,8 @@ What we'll build:
 Estimated time: 30 minutes
 Estimated cost: ~\$20 for 8-hour lab
 
-Press ENTER to start deployment...
+Starting deployment...
 EOF
-read
 
 # Setup logging
 LOG_DIR="logs/team${TEAM_NUMBER}"
