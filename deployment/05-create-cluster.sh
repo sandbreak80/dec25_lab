@@ -302,7 +302,7 @@ echo "Cluster Status:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Note: Cluster init may have modified SSH keys, so use password authentication
-expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
+CLUSTER_OUTPUT=$(expect << EOF_EXPECT 2>&1
 set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "appdctl show cluster"
 expect {
@@ -310,9 +310,21 @@ expect {
     eof
 }
 EOF_EXPECT
+)
+
+echo "$CLUSTER_OUTPUT" | sed 's/^/  /'
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
+
+# Verify all 3 nodes are present
+NODE_COUNT=$(echo "$CLUSTER_OUTPUT" | grep -c "voter" || echo "0")
+if [ "$NODE_COUNT" -ne 3 ]; then
+    log_error "Expected 3 nodes in cluster, found: $NODE_COUNT"
+    log_info "Cluster output:"
+    echo "$CLUSTER_OUTPUT"
+    exit 1
+fi
 
 # Check high-availability
 log_info "Checking high-availability status..."
@@ -348,17 +360,16 @@ cat << EOF
 Your 3-node Kubernetes cluster is ready!
 
 📊 Cluster Info:
-  Nodes: 3
+  Nodes: $NODE_COUNT
   High Availability: Yes
   Primary: $VM1_PRIV
 
-Expected cluster output:
- NODE              | ROLE  | RUNNING 
--------------------+-------+---------
- $VM1_PRIV:19001  | voter | true    
- $VM2_PRIV:19001  | voter | true    
- $VM3_PRIV:19001  | voter | true
-
+Actual Cluster Status:
 EOF
+
+# Show the actual cluster table output (filter to just the table)
+echo "$CLUSTER_OUTPUT" | grep -A 5 "NODE" | sed 's/^/  /'
+
+echo ""
 
 mark_step_complete "cluster-initialized" "$TEAM_NUMBER"
