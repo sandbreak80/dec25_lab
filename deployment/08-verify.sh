@@ -140,6 +140,76 @@ SECUREAPP_RUNNING=$(echo "$SECUREAPP_PODS" | grep -E "Running|Completed" | wc -l
 log_success "✅ Controller: $CONTROLLER_RUNNING pods running"
 log_success "✅ Events: $EVENTS_RUNNING pods running"
 log_success "✅ SecureApp: $SECUREAPP_RUNNING pods running"
+
+echo ""
+log_info "Checking service URLs..."
+echo ""
+
+# Check Controller URL (any response 200-499 is good - service is up)
+CONTROLLER_HTTP=$(expect << 'EOF_EXPECT' 2>&1 | grep -oE "[0-9]{3}" | head -1
+set timeout 15
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "curl -k -s -o /dev/null -w '%{http_code}' https://controller-team$env(TEAM_NUMBER).splunkylabs.com/controller/"
+expect {
+    "password:" { send "$env(PASSWORD)\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+)
+
+# Check Events URL
+EVENTS_HTTP=$(expect << 'EOF_EXPECT' 2>&1 | grep -oE "[0-9]{3}" | head -1
+set timeout 15
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "curl -k -s -o /dev/null -w '%{http_code}' https://team$env(TEAM_NUMBER).splunkylabs.com/events/"
+expect {
+    "password:" { send "$env(PASSWORD)\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+)
+
+# Check SecureApp URL
+SECUREAPP_HTTP=$(expect << 'EOF_EXPECT' 2>&1 | grep -oE "[0-9]{3}" | head -1
+set timeout 15
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "curl -k -s -o /dev/null -w '%{http_code}' https://team$env(TEAM_NUMBER).splunkylabs.com/secureapp/"
+expect {
+    "password:" { send "$env(PASSWORD)\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+)
+
+# Validate URLs (200-499 = service responding, 500+ or empty = problem)
+URL_ISSUES=false
+
+if [[ -z "$CONTROLLER_HTTP" ]] || [[ "$CONTROLLER_HTTP" -ge 500 ]]; then
+    log_error "❌ Controller URL not responding (HTTP: $CONTROLLER_HTTP)"
+    URL_ISSUES=true
+else
+    log_success "✅ Controller URL responding (HTTP: $CONTROLLER_HTTP)"
+fi
+
+if [[ -z "$EVENTS_HTTP" ]] || [[ "$EVENTS_HTTP" -ge 500 ]]; then
+    log_warning "⚠️  Events URL not responding (HTTP: $EVENTS_HTTP)"
+else
+    log_success "✅ Events URL responding (HTTP: $EVENTS_HTTP)"
+fi
+
+if [[ -z "$SECUREAPP_HTTP" ]] || [[ "$SECUREAPP_HTTP" -ge 500 ]]; then
+    log_warning "⚠️  SecureApp URL not responding (HTTP: $SECUREAPP_HTTP)"
+else
+    log_success "✅ SecureApp URL responding (HTTP: $SECUREAPP_HTTP)"
+fi
+
+if [[ "$URL_ISSUES" == "true" ]]; then
+    echo ""
+    log_error "Critical service URLs are not accessible!"
+    echo ""
+    echo "The Controller may still be starting after license application."
+    echo "Wait 5-10 minutes and try accessing:"
+    echo "  https://controller-team${TEAM_NUMBER}.splunkylabs.com/controller/"
+    echo ""
+    exit 1
+fi
 echo ""
 
 cat << EOF
