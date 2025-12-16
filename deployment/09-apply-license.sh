@@ -122,15 +122,26 @@ echo ""
 log_info "Step 2: Checking if Controller is running..."
 echo ""
 
-CONTROLLER_RUNNING=$(expect << EOF_EXPECT 2>/dev/null
+CONTROLLER_RUNNING=$(expect << EOF_EXPECT 2>&1
 set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "appdcli ping 2>/dev/null"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
 )
+
+CONTROLLER_CHECK_EXIT=$?
+
+if [ $CONTROLLER_CHECK_EXIT -ne 0 ]; then
+    log_error "Cannot connect to VM1"
+    log_error "Verify VM is running and accessible"
+    exit 1
+fi
 
 if echo "$CONTROLLER_RUNNING" | grep -iq "controller.*Success"; then
     log_success "Controller is running"
@@ -148,15 +159,29 @@ echo ""
 log_info "Step 3: Copying license to VM1..."
 echo ""
 
-expect << EOF_EXPECT 2>&1 | grep -E "(Warning|100%|password)" | sed 's/^/  /'
+SCP_OUTPUT=$(expect << EOF_EXPECT 2>&1
 set timeout 30
 spawn scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${LICENSE_FILE} appduser@${VM1_PUB}:/var/appd/config/license.lic
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    "No such file or directory" { puts "ERROR: Cannot write to /var/appd/config/"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
+)
 
+SCP_EXIT=$?
+
+if [ $SCP_EXIT -ne 0 ]; then
+    log_error "Failed to copy license file"
+    echo "$SCP_OUTPUT" | sed 's/^/  /'
+    exit 1
+fi
+
+echo "$SCP_OUTPUT" | grep -E "(Warning|100%)" | sed 's/^/  /'
 log_success "License copied to /var/appd/config/license.lic"
 echo ""
 
@@ -169,10 +194,21 @@ set timeout 30
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "appdcli license controller /var/appd/config/license.lic"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
 )
+
+APPLY_EXIT=$?
+
+if [ $APPLY_EXIT -ne 0 ]; then
+    log_error "Failed to apply license (cannot connect)"
+    echo "$APPLY_OUTPUT" | sed 's/^/  /'
+    exit 1
+fi
 
 echo "$APPLY_OUTPUT" | grep -v "Warning:" | grep -v "password" | sed 's/^/  /'
 
@@ -192,11 +228,14 @@ echo ""
 log_info "Step 5: Verifying license installation..."
 echo ""
 
-LICENSE_CHECK=$(expect << EOF_EXPECT 2>/dev/null
+LICENSE_CHECK=$(expect << EOF_EXPECT 2>&1
 set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "ls -lh /var/appd/config/license.lic"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT

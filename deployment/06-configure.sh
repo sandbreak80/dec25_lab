@@ -65,17 +65,24 @@ echo ""
 log_info "Downloading current configuration from VM1..."
 mkdir -p "state/team${TEAM_NUMBER}/configs"
 
-expect << EOF_EXPECT >/dev/null 2>&1
+SCP_OUTPUT=$(expect << EOF_EXPECT 2>&1
 set timeout 30
 spawn scp $SSH_OPTS appduser@$VM1_PUB:/var/appd/config/globals.yaml.gotmpl "state/team${TEAM_NUMBER}/configs/globals.yaml.gotmpl.original"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    "No such file or directory" { puts "ERROR: Config file not found"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
+)
 
-if [ $? -ne 0 ]; then
+SCP_EXIT=$?
+if [ $SCP_EXIT -ne 0 ]; then
     log_error "Failed to download config. Is VM1 accessible?"
+    echo "$SCP_OUTPUT" | sed 's/^/  /'
     exit 1
 fi
 
@@ -120,56 +127,109 @@ echo ""
 log_info "Uploading configuration to VM1..."
 
 # Backup original on VM1
-expect << EOF_EXPECT >/dev/null 2>&1
+BACKUP_OUTPUT=$(expect << EOF_EXPECT 2>&1
 set timeout 15
 spawn ssh $SSH_OPTS appduser@$VM1_PUB "sudo cp /var/appd/config/globals.yaml.gotmpl /var/appd/config/globals.yaml.gotmpl.backup"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
+)
+
+if [ $? -ne 0 ]; then
+    log_error "Failed to backup config on VM1"
+    echo "$BACKUP_OUTPUT" | sed 's/^/  /'
+    exit 1
+fi
 
 # Upload new config
-expect << EOF_EXPECT >/dev/null 2>&1
+UPLOAD_OUTPUT=$(expect << EOF_EXPECT 2>&1
 set timeout 30
 spawn scp $SSH_OPTS "state/team${TEAM_NUMBER}/configs/globals.yaml.gotmpl.updated" appduser@$VM1_PUB:/tmp/globals.yaml.gotmpl.new
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
+)
+
+if [ $? -ne 0 ]; then
+    log_error "Failed to upload config to VM1"
+    echo "$UPLOAD_OUTPUT" | sed 's/^/  /'
+    exit 1
+fi
 
 # Move into place
-expect << EOF_EXPECT >/dev/null 2>&1
+MOVE_OUTPUT=$(expect << EOF_EXPECT 2>&1
 set timeout 15
 spawn ssh $SSH_OPTS appduser@$VM1_PUB "sudo mv /tmp/globals.yaml.gotmpl.new /var/appd/config/globals.yaml.gotmpl"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
+)
 
-expect << EOF_EXPECT >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+    log_error "Failed to move config into place on VM1"
+    echo "$MOVE_OUTPUT" | sed 's/^/  /'
+    exit 1
+fi
+
+CHOWN_OUTPUT=$(expect << EOF_EXPECT 2>&1
 set timeout 15
 spawn ssh $SSH_OPTS appduser@$VM1_PUB "sudo chown appduser:appduser /var/appd/config/globals.yaml.gotmpl"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
+)
+
+if [ $? -ne 0 ]; then
+    log_error "Failed to set ownership on config file"
+    echo "$CHOWN_OUTPUT" | sed 's/^/  /'
+    exit 1
+fi
 
 log_success "Configuration uploaded"
 
 # Step 5: Verify
 log_info "Verifying configuration..."
-expect << EOF_EXPECT 2>&1 | grep "dnsDomain:"
+VERIFY_OUTPUT=$(expect << EOF_EXPECT 2>&1
 set timeout 15
 spawn ssh $SSH_OPTS appduser@$VM1_PUB "grep 'dnsDomain:' /var/appd/config/globals.yaml.gotmpl"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
+)
+
+VERIFY_EXIT=$?
+if [ $VERIFY_EXIT -ne 0 ]; then
+    log_error "Failed to verify configuration"
+    echo "$VERIFY_OUTPUT" | sed 's/^/  /'
+    exit 1
+fi
+
+echo "$VERIFY_OUTPUT" | grep "dnsDomain:"
 
 cat << EOF
 

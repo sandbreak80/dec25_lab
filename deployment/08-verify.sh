@@ -43,17 +43,24 @@ EOF
 log_info "Checking service status..."
 echo ""
 
-expect << EOF_EXPECT 2>&1
+PING_CHECK=$(expect << EOF_EXPECT 2>&1
 set timeout 30
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$VM1_PUB "appdcli ping"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
+)
 
-if [ $? -ne 0 ]; then
+PING_EXIT=$?
+
+if [ $PING_EXIT -ne 0 ]; then
     log_error "Cannot connect to VM1"
+    log_error "$PING_CHECK"
     exit 1
 fi
 
@@ -66,6 +73,9 @@ set timeout 30
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "kubectl get pods --all-namespaces | grep -E '(cisco|authn|mysql|kafka|redis)' | head -20"
 expect {
     "password:" { send "$env(PASSWORD)\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
@@ -79,6 +89,9 @@ set timeout 30
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "kubectl top nodes"
 expect {
     "password:" { send "$env(PASSWORD)\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
@@ -92,6 +105,9 @@ set timeout 30
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "appdctl show cluster"
 expect {
     "password:" { send "$env(PASSWORD)\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
@@ -107,6 +123,9 @@ set timeout 30
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "kubectl get pods -n cisco-controller -n cisco-events -n cisco-secureapp --no-headers"
 expect {
     "password:" { send "$env(PASSWORD)\r"; exp_continue }
+    "Connection refused" { puts "ERROR: Connection refused"; exit 1 }
+    "Connection timed out" { puts "ERROR: Connection timed out"; exit 1 }
+    timeout { puts "ERROR: Timeout"; exit 1 }
     eof
 }
 EOF_EXPECT
