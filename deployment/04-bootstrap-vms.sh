@@ -468,22 +468,15 @@ for i in 1 2 3; do
     VM_IP="${!VM_IP_VAR}"
     
     echo "VM${i} (${VM_IP}):"
-    if [[ "$SSH_METHOD" == "key" ]]; then
-        ssh -i "${KEY_PATH}" \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o LogLevel=ERROR \
-            appduser@${VM_IP} "appdctl show boot" 2>&1 | sed 's/^/  /'
-    else
-        expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
-set timeout 10
+    # Always use password auth (bootstrap may have modified SSH keys)
+    expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
+set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "appdctl show boot"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
     eof
 }
 EOF_EXPECT
-    fi
     echo ""
 done
 
