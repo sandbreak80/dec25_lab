@@ -99,15 +99,19 @@ bootstrap_vm_with_key() {
     # Export for expect
     export VM_IP
     
-    log_info "[$VM_NUM/3] Bootstrapping VM${VM_NUM}: $VM_IP (using SSH key)"
+    log_info "[$VM_NUM/3] Bootstrapping VM${VM_NUM}: $VM_IP (using password auth)"
     
-    # Check if bootstrap already completed (all tasks succeeded)
-    BOOT_CHECK=$(ssh -i "${KEY_PATH}" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o ConnectTimeout=5 \
-        -o LogLevel=ERROR \
-        appduser@${VM_IP} "appdctl show boot 2>&1" 2>/dev/null || true)
+    # Check if bootstrap already completed (always use password auth)
+    BOOT_CHECK=$(expect << EOF_CHECK 2>&1 || true
+set timeout 10
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "appdctl show boot 2>&1"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    timeout { puts "timeout"; exit 1 }
+    eof
+}
+EOF_CHECK
+)
     
     # If socket error, bootstrap is still in progress
     if echo "$BOOT_CHECK" | grep -q "Socket.*not found"; then
@@ -208,18 +212,25 @@ else
 fi
 BOOTSTRAP_EOF
 
-    # Copy bootstrap script
-    scp -i "${KEY_PATH}" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o LogLevel=ERROR \
-        /tmp/bootstrap-vm${VM_NUM}.sh appduser@${VM_IP}:/tmp/bootstrap.sh > /dev/null 2>&1
+    # Copy bootstrap script (using password auth)
+    expect << EOF_SCP > /dev/null 2>&1
+set timeout 30
+spawn scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /tmp/bootstrap-vm${VM_NUM}.sh appduser@${VM_IP}:/tmp/bootstrap.sh
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_SCP
     
     # Execute bootstrap with password sent via stdin to sudo -S
-    ssh -i "${KEY_PATH}" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        appduser@${VM_IP} "chmod +x /tmp/bootstrap.sh && echo '${PASSWORD}' | sudo -S /tmp/bootstrap.sh" 2>&1 | sed 's/^/  /'
+    expect << EOF_EXEC 2>&1 | sed 's/^/  /'
+set timeout 600
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "chmod +x /tmp/bootstrap.sh && echo '${PASSWORD}' | sudo -S /tmp/bootstrap.sh"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXEC
     
     BOOTSTRAP_STATUS=${PIPESTATUS[0]}
     
@@ -349,17 +360,9 @@ for i in 1 2 3; do
     
     echo "VM${i} Status:"
     
-    BOOT_OUTPUT=""
-    if [[ "$SSH_METHOD" == "key" ]]; then
-        BOOT_OUTPUT=$(ssh -i "${KEY_PATH}" \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o LogLevel=ERROR \
-            -o ConnectTimeout=10 \
-            appduser@${VM_IP} "appdctl show boot" 2>&1 || true)
-    else
-        BOOT_OUTPUT=$(expect << EOF_EXPECT 2>&1
-set timeout 10
+    # Always use password auth (bootstrap may modify SSH keys)
+    BOOT_OUTPUT=$(expect << EOF_EXPECT 2>&1
+set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "appdctl show boot"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
@@ -367,7 +370,6 @@ expect {
 }
 EOF_EXPECT
 )
-    fi
     
     echo "$BOOT_OUTPUT" | sed 's/^/  /'
     
@@ -412,17 +414,8 @@ if [ "$BOOTSTRAP_FAILED" = true ]; then
             VM_IP_VAR="VM${i}_IP"
             VM_IP="${!VM_IP_VAR}"
             
-            # Quick status check
-            BOOT_CHECK=""
-            if [[ "$SSH_METHOD" == "key" ]]; then
-                BOOT_CHECK=$(ssh -i "${KEY_PATH}" \
-                    -o StrictHostKeyChecking=no \
-                    -o UserKnownHostsFile=/dev/null \
-                    -o LogLevel=ERROR \
-                    -o ConnectTimeout=10 \
-                    appduser@${VM_IP} "appdctl show boot 2>&1 | head -5" 2>&1 || true)
-            else
-                BOOT_CHECK=$(expect << EOF_EXPECT 2>&1
+            # Quick status check (always use password auth)
+            BOOT_CHECK=$(expect << EOF_EXPECT 2>&1
 set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "appdctl show boot 2>&1 | head -5"
 expect {
@@ -432,7 +425,6 @@ expect {
 }
 EOF_EXPECT
 )
-            fi
             
             if echo "$BOOT_CHECK" | grep -q "Succeeded"; then
                 echo "  VM${i}: ✅ Complete"
@@ -440,14 +432,16 @@ EOF_EXPECT
                 echo "  VM${i}: ⏳ Still extracting images..."
                 ALL_COMPLETE=false
                 
-                # Show what's being extracted
-                if [[ "$SSH_METHOD" == "key" ]]; then
-                    EXTRACT_INFO=$(ssh -i "${KEY_PATH}" \
-                        -o StrictHostKeyChecking=no \
-                        -o UserKnownHostsFile=/dev/null \
-                        -o LogLevel=ERROR \
-                        -o ConnectTimeout=10 \
-                        appduser@${VM_IP} "echo '${PASSWORD}' | sudo -S ps aux 2>/dev/null | grep 'unxz' | grep -v grep | awk '{print \$10, \$NF}'" 2>&1 | grep -v password | head -2 || true)
+                # Show what's being extracted (always use password auth)
+                EXTRACT_INFO=$(expect << EOF_EXTRACT 2>&1 | grep -v password | head -2 || true
+set timeout 10
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "ps aux | grep 'unxz' | grep -v grep | awk '{print \\\$10, \\\$NF}'"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXTRACT
+)
                     
                     if [[ -n "$EXTRACT_INFO" ]]; then
                         while IFS= read -r line; do
@@ -460,7 +454,6 @@ EOF_EXPECT
                             fi
                         done <<< "$EXTRACT_INFO"
                     fi
-                fi
             else
                 echo "  VM${i}: ⚠️  Unknown status"
                 ALL_COMPLETE=false
