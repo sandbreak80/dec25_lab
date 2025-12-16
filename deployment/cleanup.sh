@@ -78,11 +78,14 @@ You are about to DELETE ALL resources for Team ${TEAM_NUMBER}:
 
 This will:
   ❌ Delete 3 EC2 instances
+  ❌ Delete EBS data volumes (3x 500GB)
+  ❌ Delete Elastic IPs
   ❌ Delete Application Load Balancer
   ❌ Delete Target Groups
   ❌ Delete Security Groups
-  ❌ Delete all network infrastructure
+  ❌ Delete all network infrastructure (VPC, subnets, IGW)
   ❌ Remove DNS records
+  ❌ Clean up any orphaned resources
 
 ⚠️  THIS CANNOT BE UNDONE!
 
@@ -100,11 +103,11 @@ log_info "Starting cleanup for Team ${TEAM_NUMBER}..."
 echo ""
 
 # Phase 1: DNS
-log_info "[1/8] Removing DNS records..."
+log_info "[1/10] Removing DNS records..."
 "${SCRIPT_DIR}/../scripts/delete-dns.sh" --team "$TEAM_NUMBER" 2>/dev/null || log_warning "DNS cleanup skipped"
 
 # Phase 2: ALB Listeners
-log_info "[2/8] Deleting ALB listeners..."
+log_info "[2/10] Deleting ALB listeners..."
 ALB_ARN=$(load_resource_id alb "$TEAM_NUMBER")
 if [ -n "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
     aws elbv2 describe-listeners --load-balancer-arn "$ALB_ARN" --query 'Listeners[*].ListenerArn' --output text 2>/dev/null | xargs -r -n1 aws elbv2 delete-listener --listener-arn || true
@@ -112,7 +115,7 @@ if [ -n "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
 fi
 
 # Phase 3: ALB
-log_info "[3/8] Deleting Application Load Balancer..."
+log_info "[3/10] Deleting Application Load Balancer..."
 if [ -n "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
     aws elbv2 delete-load-balancer --load-balancer-arn "$ALB_ARN" 2>/dev/null || true
     log_info "Waiting for ALB deletion..."
@@ -121,15 +124,15 @@ if [ -n "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
 fi
 
 # Phase 4: Target Groups
-log_info "[4/8] Deleting Target Groups..."
+log_info "[4/10] Deleting Target Groups..."
 TG_ARN=$(load_resource_id tg "$TEAM_NUMBER")
 if [ -n "$TG_ARN" ] && [ "$TG_ARN" != "None" ]; then
     aws elbv2 delete-target-group --target-group-arn "$TG_ARN" 2>/dev/null || true
     log_success "Target Group deleted"
 fi
 
-# Phase 5: EC2 Instances
-log_info "[5/8] Terminating EC2 instances..."
+# Phase 5: EC2 Instances and Data Volumes
+log_info "[5/10] Terminating EC2 instances and cleaning volumes..."
 VM1_ID=$(load_resource_id vm1 "$TEAM_NUMBER")
 VM2_ID=$(load_resource_id vm2 "$TEAM_NUMBER")
 VM3_ID=$(load_resource_id vm3 "$TEAM_NUMBER")
@@ -150,14 +153,33 @@ if [ -n "$INSTANCE_IDS" ]; then
         fi
     done
     
+    # Get volume IDs before terminating (data volumes have DeleteOnTermination=false)
+    log_info "Identifying data volumes to delete..."
+    VOLUME_IDS=$(aws ec2 describe-volumes \
+        --filters "Name=attachment.instance-id,Values=$INSTANCE_IDS" "Name=attachment.device,Values=/dev/sdb" \
+        --query 'Volumes[*].VolumeId' \
+        --output text 2>/dev/null)
+    
     aws ec2 terminate-instances --instance-ids $INSTANCE_IDS >/dev/null 2>&1 || true
     log_info "Waiting for instances to terminate..."
     aws ec2 wait instance-terminated --instance-ids $INSTANCE_IDS 2>/dev/null || sleep 60
     log_success "Instances and Elastic IPs deleted"
+    
+    # Delete data volumes (they don't auto-delete)
+    if [ -n "$VOLUME_IDS" ]; then
+        log_info "Deleting orphaned data volumes..."
+        for vol_id in $VOLUME_IDS; do
+            if [ -n "$vol_id" ] && [ "$vol_id" != "None" ]; then
+                log_info "  Deleting volume: $vol_id"
+                aws ec2 delete-volume --volume-id "$vol_id" 2>/dev/null || true
+            fi
+        done
+        log_success "Data volumes deleted"
+    fi
 fi
 
 # Phase 6: Network Interfaces (ENI)
-log_info "[6/8] Deleting network interfaces..."
+log_info "[6/10] Deleting network interfaces..."
 sleep 10  # Wait for instances to fully terminate
 VPC_ID=$(load_resource_id vpc "$TEAM_NUMBER")
 if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
@@ -166,7 +188,7 @@ if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
 fi
 
 # Phase 7: Security Groups
-log_info "[7/8] Deleting Security Groups..."
+log_info "[7/10] Deleting Security Groups..."
 sleep 20  # Wait for dependencies
 VM_SG_ID=$(load_resource_id vm-sg "$TEAM_NUMBER")
 ALB_SG_ID=$(load_resource_id alb-sg "$TEAM_NUMBER")
@@ -197,7 +219,7 @@ done
 log_success "Security Groups deleted"
 
 # Phase 8: Network Infrastructure
-log_info "[8/9] Deleting network infrastructure..."
+log_info "[8/10] Deleting network infrastructure..."
 VPC_ID=$(load_resource_id vpc "$TEAM_NUMBER")
 
 if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
@@ -255,8 +277,68 @@ else
     log_info "No VPC found to delete"
 fi
 
-# Phase 9: Cleanup state
-log_info "[9/9] Cleaning up state files..."
+# Phase 9: Orphan Check and Final Cleanup
+log_info "[9/10] Checking for orphaned resources..."
+
+# Check for orphaned volumes
+ORPHAN_VOLUMES=$(aws ec2 describe-volumes \
+    --filters "Name=tag:Team,Values=team${TEAM_NUMBER}" "Name=status,Values=available" \
+    --query 'Volumes[*].[VolumeId,Size,State]' \
+    --output text 2>/dev/null)
+
+if [ -n "$ORPHAN_VOLUMES" ]; then
+    log_warning "Found orphaned volumes:"
+    echo "$ORPHAN_VOLUMES"
+    log_info "Deleting orphaned volumes..."
+    echo "$ORPHAN_VOLUMES" | awk '{print $1}' | while read vol_id; do
+        if [ -n "$vol_id" ]; then
+            log_info "  Deleting volume: $vol_id"
+            aws ec2 delete-volume --volume-id "$vol_id" 2>/dev/null || true
+        fi
+    done
+fi
+
+# Check for orphaned EIPs
+ORPHAN_EIPS=$(aws ec2 describe-addresses \
+    --filters "Name=tag:Team,Values=team${TEAM_NUMBER}" \
+    --query 'Addresses[?AssociationId==`null`].[AllocationId,PublicIp]' \
+    --output text 2>/dev/null)
+
+if [ -n "$ORPHAN_EIPS" ]; then
+    log_warning "Found orphaned Elastic IPs:"
+    echo "$ORPHAN_EIPS"
+    log_info "Releasing orphaned EIPs..."
+    echo "$ORPHAN_EIPS" | awk '{print $1}' | while read alloc_id; do
+        if [ -n "$alloc_id" ]; then
+            log_info "  Releasing EIP: $alloc_id"
+            aws ec2 release-address --allocation-id "$alloc_id" 2>/dev/null || true
+        fi
+    done
+fi
+
+# Check for orphaned snapshots
+ORPHAN_SNAPSHOTS=$(aws ec2 describe-snapshots \
+    --owner-ids self \
+    --filters "Name=tag:Team,Values=team${TEAM_NUMBER}" \
+    --query 'Snapshots[*].[SnapshotId,VolumeSize,StartTime]' \
+    --output text 2>/dev/null)
+
+if [ -n "$ORPHAN_SNAPSHOTS" ]; then
+    log_warning "Found snapshots for Team ${TEAM_NUMBER}:"
+    echo "$ORPHAN_SNAPSHOTS"
+    log_info "Deleting snapshots..."
+    echo "$ORPHAN_SNAPSHOTS" | awk '{print $1}' | while read snap_id; do
+        if [ -n "$snap_id" ]; then
+            log_info "  Deleting snapshot: $snap_id"
+            aws ec2 delete-snapshot --snapshot-id "$snap_id" 2>/dev/null || true
+        fi
+    done
+fi
+
+log_success "Orphan check complete"
+
+# Phase 10: Cleanup state
+log_info "[10/10] Cleaning up state files..."
 rm -rf "state/team${TEAM_NUMBER}"
 rm -rf "logs/team${TEAM_NUMBER}"
 log_success "State cleaned"
@@ -271,9 +353,11 @@ cat << EOF
 
 All resources for Team ${TEAM_NUMBER} have been deleted:
   ✅ EC2 Instances terminated
+  ✅ EBS Data volumes deleted
   ✅ Load Balancer removed
   ✅ Network infrastructure deleted
   ✅ DNS records removed
+  ✅ Orphaned resources cleaned
   ✅ State files cleaned
 
 Thank you for participating in the AppDynamics Lab! 🎓
