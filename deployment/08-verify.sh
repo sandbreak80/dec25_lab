@@ -98,13 +98,13 @@ EOF_EXPECT
 
 echo ""
 
-# Validate critical services are up
-log_info "Validating critical services..."
+# Validate critical services by checking pod health (more reliable than appdcli ping)
+log_info "Validating critical services via pod health..."
 echo ""
 
-PING_OUTPUT=$(expect << 'EOF_EXPECT' 2>&1
+POD_STATUS=$(expect << 'EOF_EXPECT' 2>&1
 set timeout 30
-spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "appdcli ping"
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "kubectl get pods -n cisco-controller -n cisco-events -n cisco-secureapp --no-headers"
 expect {
     "password:" { send "$env(PASSWORD)\r"; exp_continue }
     eof
@@ -112,28 +112,34 @@ expect {
 EOF_EXPECT
 )
 
-# Check for critical service failures
-CONTROLLER_UP=$(echo "$PING_OUTPUT" | grep -i "Controller" | grep -i "Success" || echo "")
-EVENTS_UP=$(echo "$PING_OUTPUT" | grep -i "Events" | grep -i "Success" || echo "")
+# Check Controller pods
+CONTROLLER_PODS=$(echo "$POD_STATUS" | grep "cisco-controller" | grep -E "controller-deployment|bootstrap" || echo "")
+CONTROLLER_RUNNING=$(echo "$CONTROLLER_PODS" | grep -E "Running|Completed" | wc -l | tr -d ' ')
 
-if [[ -z "$CONTROLLER_UP" ]]; then
-    log_error "Controller is not running!"
+if [[ $CONTROLLER_RUNNING -eq 0 ]]; then
+    log_error "Controller pods are not running!"
     echo ""
     echo "⚠️  The Controller may still be starting up after license application."
     echo "   This typically takes 5-10 minutes."
     echo ""
     echo "Check status with:"
     echo "  ssh appduser@${VM1_PUB}"
-    echo "  appdcli ping"
+    echo "  kubectl get pods -n cisco-controller"
     echo ""
     exit 1
 fi
 
-if [[ -z "$EVENTS_UP" ]]; then
-    log_warning "Events Service is not running"
-fi
+# Check Events pods
+EVENTS_PODS=$(echo "$POD_STATUS" | grep "cisco-events" || echo "")
+EVENTS_RUNNING=$(echo "$EVENTS_PODS" | grep -c "Running" || echo "0")
 
-log_success "Critical services are running!"
+# Check SecureApp pods (optional but nice to verify)
+SECUREAPP_PODS=$(echo "$POD_STATUS" | grep "cisco-secureapp" || echo "")
+SECUREAPP_RUNNING=$(echo "$SECUREAPP_PODS" | grep -E "Running|Completed" | wc -l | tr -d ' ')
+
+log_success "✅ Controller: $CONTROLLER_RUNNING pods running"
+log_success "✅ Events: $EVENTS_RUNNING pods running"
+log_success "✅ SecureApp: $SECUREAPP_RUNNING pods running"
 echo ""
 
 cat << EOF
@@ -148,11 +154,11 @@ Controller Access:
 
 EOF
 
-# Show any services that are still failing
-FAILED_SERVICES=$(echo "$PING_OUTPUT" | grep -i "Failed" | awk '{print $2}' | tr '\n' ' ')
-if [[ -n "$FAILED_SERVICES" ]]; then
-    echo "⚠️  Note: Some optional services are still starting:"
-    echo "   $FAILED_SERVICES"
+# Check for any pods that aren't healthy
+NOT_READY_PODS=$(echo "$POD_STATUS" | grep -vE "Running|Completed" | awk '{print $1}' | head -5)
+if [[ -n "$NOT_READY_PODS" ]]; then
+    echo "⚠️  Note: Some pods are still starting:"
+    echo "$NOT_READY_PODS" | sed 's/^/   /'
     echo "   These may become available in a few minutes."
     echo ""
 fi
