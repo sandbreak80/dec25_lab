@@ -169,7 +169,7 @@ SSH access to VMs requires VPN connection (security group restricted).
 **For 5 teams:** ~$100/day
 
 **To minimize costs:**
-- Delete resources immediately after lab: `./lab-cleanup.sh --team N --confirm`
+- Delete resources immediately after lab: `./deployment/cleanup.sh --team N --confirm`
 - Use `m5a.xlarge` for testing (edit `config/teamN.cfg`)
 - Stop (don't terminate) instances when not in use
 
@@ -458,11 +458,11 @@ Installs all AppDynamics services
 **Time:** ~20-30 minutes  
 **Installs:** Controller, Events, EUM, Synthetic, AIOps, ATD, SecureApp
 
-### 8. lab-cleanup.sh
+### 8. cleanup.sh
 Deletes all resources for a team
 
 ```bash
-./lab-cleanup.sh --team 1 --confirm
+./deployment/cleanup.sh --team 1 --confirm
 ```
 
 **Requires:** Confirmation string `DELETE TEAM 1`
