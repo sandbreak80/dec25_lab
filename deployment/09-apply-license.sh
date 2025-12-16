@@ -59,8 +59,12 @@ if ! command -v expect &> /dev/null; then
     exit 1
 fi
 
-# Always use password auth (bootstrap/cluster init modify SSH keys)
-PASSWORD="AppDynamics123!"
+# Detect correct password based on whether password change was run
+if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
+    PASSWORD="AppDynamics123!"
+else
+    PASSWORD="appduser"
+fi
 
 echo ""
 cat << EOF

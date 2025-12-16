@@ -69,8 +69,14 @@ else
     log_info "Using password-based SSH (password: $PASSWORD)"
 fi
 
-# Export password for expect scripts
-PASSWORD="AppDynamics123!"
+# Detect correct password based on whether password change was run
+if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
+    PASSWORD="AppDynamics123!"
+    log_info "Using changed password: AppDynamics123!"
+else
+    PASSWORD="appduser"
+    log_info "Using default password: appduser (password change was skipped)"
+fi
 export PASSWORD
 
 log_info "Bootstrapping AppDynamics VMs for Team ${TEAM_NUMBER}..."

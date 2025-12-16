@@ -63,6 +63,16 @@ fi
 load_team_config "$TEAM_NUMBER"
 check_aws_cli
 
+# Detect correct password if not provided as argument
+if [ "$PASSWORD" = "AppDynamics123!" ]; then
+    # Default was not changed by --password argument, so auto-detect
+    if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
+        PASSWORD="AppDynamics123!"
+    else
+        PASSWORD="appduser"
+    fi
+fi
+
 # Check for expect
 if ! command -v expect &> /dev/null; then
     log_error "expect is not installed"

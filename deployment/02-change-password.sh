@@ -136,6 +136,12 @@ change_password 2 "$VM2_IP"
 change_password 3 "$VM3_IP"
 
 log_success "All VM passwords changed successfully!"
+
+# Create flag file so other scripts know password was changed
+mkdir -p "state/team${TEAM_NUMBER}"
+echo "$NEW_PASSWORD" > "state/team${TEAM_NUMBER}/password-changed.flag"
+chmod 600 "state/team${TEAM_NUMBER}/password-changed.flag"
+
 echo ""
 cat << EOF
 ╔══════════════════════════════════════════════════════════╗

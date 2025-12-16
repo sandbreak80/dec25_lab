@@ -47,8 +47,12 @@ EOF
 
 VM1_PUB=$(cat "state/team${TEAM_NUMBER}/vm1-public-ip.txt")
 
-# Always use password auth (bootstrap/cluster init modify SSH keys)
-PASSWORD="AppDynamics123!"
+# Detect correct password based on whether password change was run
+if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
+    PASSWORD="AppDynamics123!"
+else
+    PASSWORD="appduser"
+fi
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 log_info "Using password authentication (AppDynamics modifies keys during bootstrap)"
 

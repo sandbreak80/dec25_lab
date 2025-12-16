@@ -144,7 +144,7 @@ log_info "Estimated time: 70-80 minutes"
 echo ""
 
 if [ "$SKIP_PASSWORD_CHANGE" = true ]; then
-    log_warning "Password change will be SKIPPED (using default: AppDynamics123!)"
+    log_warning "Password change will be SKIPPED (using default: appduser)"
 fi
 if [ "$SKIP_SSH_KEYS" = true ]; then
     log_warning "SSH key setup will be SKIPPED (using password auth)"
@@ -210,7 +210,7 @@ else
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | tee -a "$DEPLOY_LOG"
     log_both "${MAGENTA}${BOLD}[3/10] Change VM Password${NC}"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | tee -a "$DEPLOY_LOG"
-    log_both "${YELLOW}⏭️  SKIPPED (using default password: AppDynamics123!)${NC}"
+    log_both "${YELLOW}⏭️  SKIPPED (using default password: appduser)${NC}"
 fi
 
 # =============================================================================

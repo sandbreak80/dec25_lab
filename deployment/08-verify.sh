@@ -21,8 +21,12 @@ load_team_config "$TEAM_NUMBER"
 
 VM1_PUB=$(cat "state/team${TEAM_NUMBER}/vm1-public-ip.txt")
 
-# Always use password auth (bootstrap/cluster init modify SSH keys)
-PASSWORD="AppDynamics123!"
+# Detect correct password based on whether password change was run
+if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
+    PASSWORD="AppDynamics123!"
+else
+    PASSWORD="appduser"
+fi
 export VM1_PUB PASSWORD
 
 # Check for expect
