@@ -57,25 +57,13 @@ fi
 load_team_config "$TEAM_NUMBER"
 check_aws_cli
 
-# Check if SSH key is configured
-KEY_PATH=$(cat "state/team${TEAM_NUMBER}/ssh-key-path.txt" 2>/dev/null || echo "")
-if [[ -n "$KEY_PATH" ]] && [[ -f "$KEY_PATH" ]]; then
-    SSH_METHOD="key"
-    log_info "Using SSH key: $KEY_PATH"
-    export KEY_PATH  # For expect scripts
-else
-    SSH_METHOD="password"
-    PASSWORD="AppDynamics123!"
-    log_info "Using password-based SSH (password: $PASSWORD)"
-fi
-
 # Detect correct password based on whether password change was run
 if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
     PASSWORD="AppDynamics123!"
-    log_info "Using changed password: AppDynamics123!"
+    log_info "Using changed password (AppDynamics123!)"
 else
     PASSWORD="appduser"
-    log_info "Using default password: appduser (password change was skipped)"
+    log_info "Using default password (appduser - password change was skipped)"
 fi
 export PASSWORD
 
