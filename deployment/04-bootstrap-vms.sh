@@ -246,6 +246,11 @@ EOF_EXEC
     echo ""
 }
 
+# Alias for password-based bootstrap (same as key-based since both use expect with password)
+bootstrap_vm_with_password() {
+    bootstrap_vm_with_key "$@"
+}
+
 # Bootstrap all VMs based on SSH method
 if [[ "$SSH_METHOD" == "key" ]]; then
     bootstrap_vm_with_key 1 "$VM1_IP" "$VM1_PRIVATE"
