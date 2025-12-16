@@ -148,7 +148,16 @@ echo ""
 for i in {1..30}; do
     sleep 60
     echo "  Check $i/30..."
-    ssh $SSH_OPTS appduser@$VM1_PUB "appdcli ping" 2>&1 | tee "state/team${TEAM_NUMBER}/service-status-check.txt"
+    
+    # Use expect with password auth (no prompts!)
+    expect << EOF_CHECK 2>&1 | tee "state/team${TEAM_NUMBER}/service-status-check.txt"
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "appdcli ping"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_CHECK
     
     # Check if all services are up
     if grep -q "Success" "state/team${TEAM_NUMBER}/service-status-check.txt" && \
