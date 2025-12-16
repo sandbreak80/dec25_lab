@@ -257,6 +257,29 @@ else
     bootstrap_vm_with_password 3 "$VM3_IP" "$VM3_PRIVATE"
 fi
 
+# CRITICAL: Ensure passwordless sudo is configured on all VMs
+# This is needed for cluster init operations
+log_info "Ensuring passwordless sudo is configured on all VMs..."
+echo ""
+
+for i in 1 2 3; do
+    VM_IP_VAR="VM${i}_IP"
+    VM_IP="${!VM_IP_VAR}"
+    
+    log_info "Configuring passwordless sudo on VM${i}..."
+    expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
+set timeout 15
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM_IP} "echo '${PASSWORD}' | sudo -S sh -c 'echo \"appduser ALL=(ALL) NOPASSWD: ALL\" > /etc/sudoers.d/appduser && chmod 440 /etc/sudoers.d/appduser'"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+done
+
+log_success "Passwordless sudo configured on all VMs"
+echo ""
+
 # CRITICAL: Copy VM1's SSH key to VM2/VM3 for cluster init
 # appdctl cluster init needs VM1 to SSH to VM2/VM3
 log_info "Setting up VM-to-VM SSH for cluster init..."
