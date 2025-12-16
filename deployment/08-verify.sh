@@ -97,13 +97,62 @@ expect {
 EOF_EXPECT
 
 echo ""
+
+# Validate critical services are up
+log_info "Validating critical services..."
+echo ""
+
+PING_OUTPUT=$(expect << 'EOF_EXPECT' 2>&1
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "appdcli ping"
+expect {
+    "password:" { send "$env(PASSWORD)\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+)
+
+# Check for critical service failures
+CONTROLLER_UP=$(echo "$PING_OUTPUT" | grep -i "Controller" | grep -i "Success" || echo "")
+EVENTS_UP=$(echo "$PING_OUTPUT" | grep -i "Events" | grep -i "Success" || echo "")
+
+if [[ -z "$CONTROLLER_UP" ]]; then
+    log_error "Controller is not running!"
+    echo ""
+    echo "⚠️  The Controller may still be starting up after license application."
+    echo "   This typically takes 5-10 minutes."
+    echo ""
+    echo "Check status with:"
+    echo "  ssh appduser@${VM1_PUB}"
+    echo "  appdcli ping"
+    echo ""
+    exit 1
+fi
+
+if [[ -z "$EVENTS_UP" ]]; then
+    log_warning "Events Service is not running"
+fi
+
+log_success "Critical services are running!"
+echo ""
+
 cat << EOF
 ╔══════════════════════════════════════════════════════════╗
-║   Controller Access                                      ║
+║   ✅ Deployment Complete!                                ║
 ╚══════════════════════════════════════════════════════════╝
 
-URL:  https://controller-team${TEAM_NUMBER}.splunkylabs.com/controller/
-User: admin
-Pass: welcome (CHANGE THIS!)
+Controller Access:
+  URL:  https://controller-team${TEAM_NUMBER}.splunkylabs.com/controller/
+  User: admin
+  Pass: welcome (CHANGE THIS!)
 
 EOF
+
+# Show any services that are still failing
+FAILED_SERVICES=$(echo "$PING_OUTPUT" | grep -i "Failed" | awk '{print $2}' | tr '\n' ' ')
+if [[ -n "$FAILED_SERVICES" ]]; then
+    echo "⚠️  Note: Some optional services are still starting:"
+    echo "   $FAILED_SERVICES"
+    echo "   These may become available in a few minutes."
+    echo ""
+fi
