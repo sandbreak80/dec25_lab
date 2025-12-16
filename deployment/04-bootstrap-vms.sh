@@ -262,12 +262,24 @@ fi
 log_info "Setting up VM-to-VM SSH for cluster init..."
 echo ""
 
-# Get VM1's public key (generated during bootstrap)
+# Get VM1's public key (generate if needed, then retrieve)
 log_info "Retrieving VM1's SSH public key..."
 # Always use password auth (bootstrap may have modified SSH keys)
-VM1_PUB_KEY=$(expect << EOF_EXPECT 2>/dev/null
+
+# First, ensure SSH key exists on VM1
+expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
 set timeout 15
-spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_IP} "test -f ~/.ssh/id_ed25519.pub && cat ~/.ssh/id_ed25519.pub || (test -f ~/.ssh/id_rsa.pub && cat ~/.ssh/id_rsa.pub)"
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_IP} "test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N '' -q"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+
+# Now retrieve the public key
+VM1_PUB_KEY=$(expect << EOF_EXPECT 2>&1 | grep "^ssh-"
+set timeout 15
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_IP} "cat ~/.ssh/id_ed25519.pub"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
     eof
