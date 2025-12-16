@@ -231,11 +231,6 @@ Deploy your complete AppDynamics lab environment in ~40 minutes:
 ./deployment/08-verify.sh --team 1
 ```
 
-**Or use the complete build script:**
-```bash
-./deployment/complete-build.sh --team 1
-```
-
 ## 📊 What Gets Deployed
 
 Each team gets a complete, isolated environment:
@@ -293,8 +288,7 @@ appd-virtual-appliance/deploy/aws/
 │   ├── 07-install.sh            # Install services
 │   ├── 08-verify.sh             # Verify deployment
 │   ├── 09-apply-license.sh      # Apply license from S3
-│   ├── cleanup.sh               # Delete all resources
-│   └── complete-build.sh        # End-to-end automation
+│   └── cleanup.sh               # Delete all resources
 │
 ├── scripts/                     # Infrastructure automation
 │   ├── create-network.sh        # VPC, subnets, IGW
