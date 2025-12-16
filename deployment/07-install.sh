@@ -81,14 +81,16 @@ EOF
 
 VM1_PUB=$(cat "state/team${TEAM_NUMBER}/vm1-public-ip.txt")
 
-# Determine SSH method
-if [[ -f "state/team${TEAM_NUMBER}/ssh-key-path.txt" ]]; then
-    KEY_PATH=$(cat "state/team${TEAM_NUMBER}/ssh-key-path.txt")
-    SSH_OPTS="-i ${KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
-    log_info "Using SSH key: $KEY_PATH"
-else
-    SSH_OPTS="-o StrictHostKeyChecking=no"
-    log_warning "No SSH key found, using password authentication"
+# Always use password auth (bootstrap/cluster init modify SSH keys)
+PASSWORD="AppDynamics123!"
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+log_info "Using password authentication (AppDynamics modifies keys during bootstrap)"
+
+# Check for expect
+if ! command -v expect &> /dev/null; then
+    log_error "expect is not installed"
+    echo "Install expect first: brew install expect"
+    exit 1
 fi
 
 echo ""
@@ -97,7 +99,16 @@ echo ""
 
 # Step 1: Verify cluster health
 log_info "Step 1: Verifying cluster health..."
-ssh $SSH_OPTS appduser@$VM1_PUB "appdctl show cluster" 2>&1 | tee "state/team${TEAM_NUMBER}/cluster-status.txt"
+
+expect << EOF_EXPECT 2>&1 | tee "state/team${TEAM_NUMBER}/cluster-status.txt"
+set timeout 30
+spawn ssh $SSH_OPTS appduser@$VM1_PUB "appdctl show cluster"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+
 if [ ${PIPESTATUS[0]} -ne 0 ]; then
     log_error "Cluster check failed"
     exit 1
@@ -110,7 +121,14 @@ log_info "Step 2: Starting AppDynamics installation..."
 log_warning "This will take 20-30 minutes. Please be patient..."
 echo ""
 
-ssh $SSH_OPTS appduser@$VM1_PUB "appdcli start all $PROFILE" 2>&1 | sed 's/^/  /'
+expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
+set timeout 3600
+spawn ssh $SSH_OPTS appduser@$VM1_PUB "appdcli start all $PROFILE"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
 
 if [ ${PIPESTATUS[0]} -ne 0 ]; then
     log_error "Installation command failed"
@@ -150,7 +168,15 @@ echo ""
 echo ""
 log_info "Final verification..."
 
-ssh $SSH_OPTS appduser@$VM1_PUB "appdcli ping" 2>&1 | tee "state/team${TEAM_NUMBER}/service-status.txt"
+expect << EOF_EXPECT 2>&1 | tee "state/team${TEAM_NUMBER}/service-status.txt"
+set timeout 30
+spawn ssh $SSH_OPTS appduser@$VM1_PUB "appdcli ping"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+
 log_success "Services verified!"
 
 cat << EOF

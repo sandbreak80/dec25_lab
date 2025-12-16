@@ -55,17 +55,15 @@ fi
 load_team_config "$TEAM_NUMBER"
 check_aws_cli
 
-# Check if SSH key is configured
+# Always use password auth (bootstrap/cluster init modify SSH keys)
+PASSWORD="AppDynamics123!"
+
+# Check if SSH key is configured (for informational purposes only)
 KEY_PATH=$(cat "state/team${TEAM_NUMBER}/ssh-key-path.txt" 2>/dev/null || echo "")
 if [[ -n "$KEY_PATH" ]] && [[ -f "$KEY_PATH" ]]; then
-    SSH_METHOD="key"
-    SSH_OPTS="-i ${KEY_PATH}"
-    log_info "Using SSH key: $KEY_PATH"
+    log_info "SSH keys were configured, but using password auth (AppDynamics modifies keys during bootstrap)"
 else
-    SSH_METHOD="password"
-    SSH_OPTS=""
-    PASSWORD="AppDynamics123!"
-    log_info "Using password-based SSH"
+    log_info "Using password-based SSH authentication"
 fi
 
 echo ""
@@ -105,10 +103,8 @@ check_bootstrap_complete() {
     
     log_info "Checking VM${VM_NUM} bootstrap status..."
     
-    if [[ "$SSH_METHOD" == "key" ]]; then
-        BOOT_STATUS=$(ssh ${SSH_OPTS} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 appduser@${VM1_PUB} "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 appduser@${VM_IP} 'appdctl show boot'" 2>/dev/null)
-    else
-        BOOT_STATUS=$(expect << EOF_EXPECT 2>/dev/null
+    # Always use password auth (bootstrap may have modified SSH keys)
+    BOOT_STATUS=$(expect << EOF_EXPECT 2>/dev/null
 set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "ssh -o StrictHostKeyChecking=no appduser@${VM_IP} 'appdctl show boot'"
 expect {
@@ -117,7 +113,6 @@ expect {
 }
 EOF_EXPECT
 )
-    fi
     
     # Check if all bootstrap steps show "Succeeded"
     if echo "$BOOT_STATUS" | grep -q "STATUS" && ! echo "$BOOT_STATUS" | grep -E "(Failed|InProgress|Pending)" > /dev/null; then
@@ -145,10 +140,8 @@ for i in 1 2 3; do
     # For VM1, check directly; for VM2/VM3, check via VM1
     if [ $i -eq 1 ]; then
         log_info "Checking VM1 bootstrap status (direct)..."
-        if [[ "$SSH_METHOD" == "key" ]]; then
-            BOOT_STATUS=$(ssh ${SSH_OPTS} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 appduser@${VM1_PUB} "appdctl show boot" 2>&1)
-        else
-            BOOT_STATUS=$(expect << 'EOF_EXPECT' 2>&1
+        # Always use password auth (bootstrap may have modified SSH keys)
+        BOOT_STATUS=$(expect << EOF_EXPECT 2>&1
 set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "appdctl show boot"
 expect {
@@ -157,7 +150,6 @@ expect {
 }
 EOF_EXPECT
 )
-        fi
         
         if echo "$BOOT_STATUS" | grep -q "STATUS" && echo "$BOOT_STATUS" | grep -q "Succeeded" && ! echo "$BOOT_STATUS" | grep -E "(Failed|InProgress)" > /dev/null; then
             log_success "VM1 bootstrap: Complete"
@@ -202,15 +194,8 @@ verify_node() {
     
     log_info "Checking $NODE ($NODE_IP)..."
     
-    if [[ "$SSH_METHOD" == "key" ]]; then
-        ssh ${SSH_OPTS} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 appduser@${VM1_PUB} "ping -c 2 -W 2 ${NODE_IP} >/dev/null 2>&1" && {
-            log_success "$NODE is reachable"
-        } || {
-            log_error "$NODE is not reachable from VM1"
-            return 1
-        }
-    else
-        expect << EOF_EXPECT
+    # Use password auth (bootstrap may have modified SSH keys)
+    expect << EOF_EXPECT
 set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "ping -c 2 -W 2 ${NODE_IP}"
 expect {
@@ -220,12 +205,11 @@ expect {
 }
 expect eof
 EOF_EXPECT
-        if [ $? -eq 0 ]; then
-            log_success "$NODE is reachable"
-        else
-            log_error "$NODE is not reachable from VM1"
-            return 1
-        fi
+    if [ $? -eq 0 ]; then
+        log_success "$NODE is reachable"
+    else
+        log_error "$NODE is not reachable from VM1"
+        return 1
     fi
 }
 
@@ -240,11 +224,8 @@ echo ""
 log_info "Step 3: Adding VM2/VM3 host keys to VM1's known_hosts..."
 echo ""
 
-if [[ "$SSH_METHOD" == "key" ]]; then
-    # Scan and add host keys for VM2 and VM3
-    ssh ${SSH_OPTS} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "ssh-keyscan -H ${VM2_PRIV} ${VM3_PRIV} >> ~/.ssh/known_hosts 2>/dev/null" 2>&1 | sed 's/^/  /'
-else
-    expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
+# Use password auth (bootstrap may have modified SSH keys)
+expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
 set timeout 30
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "ssh-keyscan -H ${VM2_PRIV} ${VM3_PRIV} >> ~/.ssh/known_hosts"
 expect {
@@ -252,7 +233,6 @@ expect {
     eof
 }
 EOF_EXPECT
-fi
 
 log_success "Host keys added"
 echo ""
@@ -265,16 +245,8 @@ echo ""
 log_warning "This takes ~10 minutes. Please wait..."
 echo ""
 
-if [[ "$SSH_METHOD" == "key" ]]; then
-    # With SSH keys - fully automated
-    ssh ${SSH_OPTS} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "cd /home/appduser && appdctl cluster init $VM2_PRIV $VM3_PRIV" 2>&1 | while IFS= read -r line; do
-        echo "  $line"
-    done
-    
-    RESULT=${PIPESTATUS[0]}
-else
-    # With password - use expect
-    expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
+# Use password auth (bootstrap may have modified SSH keys)
+expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
 set timeout 900
 log_user 1
 
@@ -297,9 +269,8 @@ expect {
     eof
 }
 EOF_EXPECT
-    
-    RESULT=$?
-fi
+
+RESULT=$?
 
 echo ""
 
@@ -330,10 +301,8 @@ sleep 5
 echo "Cluster Status:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-if [[ "$SSH_METHOD" == "key" ]]; then
-    ssh ${SSH_OPTS} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "appdctl show cluster" 2>&1 | sed 's/^/  /'
-else
-    expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
+# Note: Cluster init may have modified SSH keys, so use password authentication
+expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
 set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "appdctl show cluster"
 expect {
@@ -341,7 +310,6 @@ expect {
     eof
 }
 EOF_EXPECT
-fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
@@ -350,10 +318,8 @@ echo ""
 log_info "Checking high-availability status..."
 echo ""
 
-if [[ "$SSH_METHOD" == "key" ]]; then
-    HA_STATUS=$(ssh ${SSH_OPTS} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "microk8s status" 2>/dev/null | grep "high-availability" || echo "")
-else
-    HA_STATUS=$(expect << 'EOF_EXPECT' 2>/dev/null | grep "high-availability" || echo ""
+# Use password authentication (cluster init may have modified SSH keys)
+HA_STATUS=$(expect << EOF_EXPECT 2>/dev/null | grep "high-availability" || echo ""
 set timeout 15
 spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "microk8s status"
 expect {
@@ -362,7 +328,6 @@ expect {
 }
 EOF_EXPECT
 )
-fi
 
 if [[ -n "$HA_STATUS" ]]; then
     log_success "High-availability is enabled"

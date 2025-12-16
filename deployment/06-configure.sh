@@ -47,14 +47,16 @@ EOF
 
 VM1_PUB=$(cat "state/team${TEAM_NUMBER}/vm1-public-ip.txt")
 
-# Determine SSH method
-if [[ -f "state/team${TEAM_NUMBER}/ssh-key-path.txt" ]]; then
-    KEY_PATH=$(cat "state/team${TEAM_NUMBER}/ssh-key-path.txt")
-    SSH_OPTS="-i ${KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
-    log_info "Using SSH key: $KEY_PATH"
-else
-    SSH_OPTS="-o StrictHostKeyChecking=no"
-    log_warning "No SSH key found, will prompt for password"
+# Always use password auth (bootstrap/cluster init modify SSH keys)
+PASSWORD="AppDynamics123!"
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+log_info "Using password authentication (AppDynamics modifies keys during bootstrap)"
+
+# Check for expect
+if ! command -v expect &> /dev/null; then
+    log_error "expect is not installed"
+    echo "Install expect first: brew install expect"
+    exit 1
 fi
 
 echo ""
@@ -63,11 +65,19 @@ echo ""
 log_info "Downloading current configuration from VM1..."
 mkdir -p "state/team${TEAM_NUMBER}/configs"
 
-scp $SSH_OPTS appduser@$VM1_PUB:/var/appd/config/globals.yaml.gotmpl \
-    "state/team${TEAM_NUMBER}/configs/globals.yaml.gotmpl.original" || {
+expect << EOF_EXPECT >/dev/null 2>&1
+set timeout 30
+spawn scp $SSH_OPTS appduser@$VM1_PUB:/var/appd/config/globals.yaml.gotmpl "state/team${TEAM_NUMBER}/configs/globals.yaml.gotmpl.original"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+
+if [ $? -ne 0 ]; then
     log_error "Failed to download config. Is VM1 accessible?"
     exit 1
-}
+fi
 
 log_success "Config downloaded"
 
@@ -110,21 +120,56 @@ echo ""
 log_info "Uploading configuration to VM1..."
 
 # Backup original on VM1
-ssh $SSH_OPTS appduser@$VM1_PUB "sudo cp /var/appd/config/globals.yaml.gotmpl /var/appd/config/globals.yaml.gotmpl.backup"
+expect << EOF_EXPECT >/dev/null 2>&1
+set timeout 15
+spawn ssh $SSH_OPTS appduser@$VM1_PUB "sudo cp /var/appd/config/globals.yaml.gotmpl /var/appd/config/globals.yaml.gotmpl.backup"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
 
 # Upload new config
-scp $SSH_OPTS "state/team${TEAM_NUMBER}/configs/globals.yaml.gotmpl.updated" \
-    appduser@$VM1_PUB:/tmp/globals.yaml.gotmpl.new
+expect << EOF_EXPECT >/dev/null 2>&1
+set timeout 30
+spawn scp $SSH_OPTS "state/team${TEAM_NUMBER}/configs/globals.yaml.gotmpl.updated" appduser@$VM1_PUB:/tmp/globals.yaml.gotmpl.new
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
 
 # Move into place
-ssh $SSH_OPTS appduser@$VM1_PUB "sudo mv /tmp/globals.yaml.gotmpl.new /var/appd/config/globals.yaml.gotmpl"
-ssh $SSH_OPTS appduser@$VM1_PUB "sudo chown appduser:appduser /var/appd/config/globals.yaml.gotmpl"
+expect << EOF_EXPECT >/dev/null 2>&1
+set timeout 15
+spawn ssh $SSH_OPTS appduser@$VM1_PUB "sudo mv /tmp/globals.yaml.gotmpl.new /var/appd/config/globals.yaml.gotmpl"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+
+expect << EOF_EXPECT >/dev/null 2>&1
+set timeout 15
+spawn ssh $SSH_OPTS appduser@$VM1_PUB "sudo chown appduser:appduser /var/appd/config/globals.yaml.gotmpl"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
 
 log_success "Configuration uploaded"
 
 # Step 5: Verify
 log_info "Verifying configuration..."
-ssh $SSH_OPTS appduser@$VM1_PUB "grep 'dnsDomain:' /var/appd/config/globals.yaml.gotmpl"
+expect << EOF_EXPECT 2>&1 | grep "dnsDomain:"
+set timeout 15
+spawn ssh $SSH_OPTS appduser@$VM1_PUB "grep 'dnsDomain:' /var/appd/config/globals.yaml.gotmpl"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
 
 cat << EOF
 

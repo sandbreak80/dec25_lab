@@ -48,6 +48,7 @@
         "ec2:DetachNetworkInterface",
         "ec2:DisassociateAddress",
         "ec2:DisassociateRouteTable",
+        "ec2:ModifySubnetAttribute",
         "ec2:ModifyVpcAttribute",
         "ec2:ReleaseAddress",
         "ec2:RevokeSecurityGroupEgress",
@@ -97,6 +98,7 @@
         "elasticloadbalancing:DescribeTargetHealth",
         "elasticloadbalancing:ModifyListener",
         "elasticloadbalancing:ModifyLoadBalancerAttributes",
+        "elasticloadbalancing:ModifyTargetGroup",
         "elasticloadbalancing:RegisterTargets",
         "elasticloadbalancing:RemoveTags",
         "elasticloadbalancing:SetSecurityGroups"
@@ -146,6 +148,18 @@
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "S3LabResourcesReadAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::appdynamics-lab-resources",
+        "arn:aws:s3:::appdynamics-lab-resources/*"
+      ]
     }
   ]
 }
