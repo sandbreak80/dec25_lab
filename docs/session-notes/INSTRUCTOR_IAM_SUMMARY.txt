@@ -1,0 +1,153 @@
+╔══════════════════════════════════════════════════════════╗
+║  Lab IAM Setup - Instructor Summary                     ║
+╚══════════════════════════════════════════════════════════╝
+
+SETUP COMPLETED: December 16, 2025
+EXPIRES: December 23, 2025
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT WAS CREATED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ IAM Policy: AppDynamicsLabStudentPolicy
+   ARN: arn:aws:iam::314839308236:policy/AppDynamicsLabStudentPolicy
+   Permissions: Restricted EC2, ELB, Route53, ACM (read-only)
+   Restrictions: us-west-2 only, specific instance types
+
+✅ IAM User: lab-student
+   ARN: arn:aws:iam::314839308236:user/lab-student
+   Policy: AppDynamicsLabStudentPolicy (attached)
+
+✅ Access Keys: AKIA**************** (REDACTED)
+   Status: Active
+   Created: 2025-12-16
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FILES CREATED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📄 STUDENT_CREDENTIALS.txt
+   → Share this file with ALL students
+   → Contains setup instructions and credentials
+   → Formatted for easy distribution
+
+📄 lab-student-credentials.json
+   → Raw JSON output from AWS
+   → Keep this secure (backup)
+   → DO NOT share this directly
+
+📄 DELETE_LAB_USER.sh
+   → Run this after December 23, 2025
+   → Deletes user, keys, and policy
+   → Safe to run (prompts for confirmation)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NEXT STEPS FOR INSTRUCTOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DISTRIBUTE CREDENTIALS TO STUDENTS:
+   
+   Option A: Print STUDENT_CREDENTIALS.txt and hand out in class
+   Option B: Share file via secure method (not email!)
+   Option C: Display on screen for students to copy
+
+2. VERIFY PREREQUISITES EXIST:
+   
+   ✓ Route 53 Hosted Zone: splunkylabs.com
+   ✓ ACM Certificate: *.splunkylabs.com (us-west-2)
+   ✓ AMI: AppDynamics lab image (ami-xyz...)
+
+3. HAVE STUDENTS TEST ACCESS:
+   
+   Students should run:
+   - aws configure (enter credentials)
+   - aws sts get-caller-identity
+   - ./scripts/check-prerequisites.sh
+
+4. MONITOR USAGE DURING LAB:
+   
+   Check what students are creating:
+   aws ec2 describe-instances \
+     --filters "Name=tag:Team,Values=team*" \
+     --query 'Reservations[*].Instances[*].[Tags[?Key==`Name`].Value|[0],State.Name,InstanceType]' \
+     --output table
+
+5. AFTER LAB ENDS (Dec 23+):
+   
+   Delete IAM access:
+   ./DELETE_LAB_USER.sh
+
+   Verify all student resources are cleaned up:
+   aws ec2 describe-instances \
+     --filters "Name=tag:Team,Values=team*" \
+     --query 'Reservations[*].Instances[*].State.Name'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECURITY NOTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Students CANNOT:
+   - Create/modify IAM resources
+   - Access your admin resources
+   - Launch resources outside us-west-2
+   - Launch unapproved instance types
+   - Access billing information
+
+✅ Students CAN:
+   - Deploy lab infrastructure (VPC, EC2, ALB)
+   - Create DNS records in existing zone
+   - View ACM certificates (read-only)
+   - Deploy up to 5 teams (team1-team5)
+
+⚠️  All students share the same credentials
+⚠️  Resources are isolated by team tags
+⚠️  Each team uses separate VPC and resources
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+If a student gets "Access Denied" errors:
+
+1. Verify they configured credentials correctly:
+   aws sts get-caller-identity
+   # Should show: lab-student user
+
+2. Check if they're in the right region:
+   aws configure get region
+   # Should show: us-west-2
+
+3. Check if policy is attached:
+   aws iam list-attached-user-policies --user-name lab-student
+
+4. Verify the operation is allowed in iam-student-policy.json
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+QUICK COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Check user status
+aws iam get-user --user-name lab-student
+
+# List all access keys
+aws iam list-access-keys --user-name lab-student
+
+# Deactivate keys (don't delete yet)
+aws iam update-access-key --user-name lab-student \
+  --access-key-id AKIA**************** --status Inactive
+
+# Reactivate keys if needed
+aws iam update-access-key --user-name lab-student \
+  --access-key-id AKIA**************** --status Active
+
+# Delete everything (use script instead)
+./DELETE_LAB_USER.sh
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For questions or issues, see:
+- docs/IAM_REQUIREMENTS.md (detailed policy documentation)
+- docs/iam-student-policy.json (policy JSON)
+- START_HERE.md (student deployment guide)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
