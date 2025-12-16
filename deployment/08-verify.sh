@@ -178,14 +178,22 @@ expect {
 EOF_EXPECT
 )
 
-# Validate URLs (200-499 = service responding, 500+ or empty = problem)
+# Validate URLs
+# 200-299 = OK, 300-399 = Redirect (normal for auth), 401/403 = Auth required (service UP!)
+# Only 500+ or empty = actual problem
 URL_ISSUES=false
 
 if [[ -z "$CONTROLLER_HTTP" ]] || [[ "$CONTROLLER_HTTP" -ge 500 ]]; then
     log_error "❌ Controller URL not responding (HTTP: $CONTROLLER_HTTP)"
     URL_ISSUES=true
 else
-    log_success "✅ Controller URL responding (HTTP: $CONTROLLER_HTTP)"
+    if [[ "$CONTROLLER_HTTP" -ge 300 ]] && [[ "$CONTROLLER_HTTP" -lt 400 ]]; then
+        log_success "✅ Controller URL responding (HTTP: $CONTROLLER_HTTP - redirect, normal)"
+    elif [[ "$CONTROLLER_HTTP" -eq 401 ]] || [[ "$CONTROLLER_HTTP" -eq 403 ]]; then
+        log_success "✅ Controller URL responding (HTTP: $CONTROLLER_HTTP - auth required, service UP!)"
+    else
+        log_success "✅ Controller URL responding (HTTP: $CONTROLLER_HTTP)"
+    fi
 fi
 
 if [[ -z "$EVENTS_HTTP" ]] || [[ "$EVENTS_HTTP" -ge 500 ]]; then
@@ -197,7 +205,13 @@ fi
 if [[ -z "$SECUREAPP_HTTP" ]] || [[ "$SECUREAPP_HTTP" -ge 500 ]]; then
     log_warning "⚠️  SecureApp URL not responding (HTTP: $SECUREAPP_HTTP)"
 else
-    log_success "✅ SecureApp URL responding (HTTP: $SECUREAPP_HTTP)"
+    if [[ "$SECUREAPP_HTTP" -ge 300 ]] && [[ "$SECUREAPP_HTTP" -lt 400 ]]; then
+        log_success "✅ SecureApp URL responding (HTTP: $SECUREAPP_HTTP - redirect to auth, normal!)"
+    elif [[ "$SECUREAPP_HTTP" -eq 401 ]] || [[ "$SECUREAPP_HTTP" -eq 403 ]]; then
+        log_success "✅ SecureApp URL responding (HTTP: $SECUREAPP_HTTP - auth required, service UP!)"
+    else
+        log_success "✅ SecureApp URL responding (HTTP: $SECUREAPP_HTTP)"
+    fi
 fi
 
 if [[ "$URL_ISSUES" == "true" ]]; then
