@@ -171,6 +171,24 @@ sleep 20  # Wait for dependencies
 VM_SG_ID=$(load_resource_id vm-sg "$TEAM_NUMBER")
 ALB_SG_ID=$(load_resource_id alb-sg "$TEAM_NUMBER")
 
+# First revoke all ingress/egress rules to remove dependencies
+for sg in $ALB_SG_ID $VM_SG_ID; do
+    if [ -n "$sg" ] && [ "$sg" != "None" ]; then
+        # Revoke ingress rules
+        aws ec2 describe-security-groups --group-ids "$sg" --query 'SecurityGroups[0].IpPermissions' --output json 2>/dev/null | \
+            jq -c '.[]' 2>/dev/null | while read rule; do
+                aws ec2 revoke-security-group-ingress --group-id "$sg" --ip-permissions "$rule" 2>/dev/null || true
+            done
+        
+        # Revoke egress rules
+        aws ec2 describe-security-groups --group-ids "$sg" --query 'SecurityGroups[0].IpPermissionsEgress' --output json 2>/dev/null | \
+            jq -c '.[]' 2>/dev/null | while read rule; do
+                aws ec2 revoke-security-group-egress --group-id "$sg" --ip-permissions "$rule" 2>/dev/null || true
+            done
+    fi
+done
+
+# Now delete security groups
 for sg in $ALB_SG_ID $VM_SG_ID; do
     if [ -n "$sg" ] && [ "$sg" != "None" ]; then
         aws ec2 delete-security-group --group-id "$sg" 2>/dev/null || true
@@ -183,22 +201,58 @@ log_info "[8/9] Deleting network infrastructure..."
 VPC_ID=$(load_resource_id vpc "$TEAM_NUMBER")
 
 if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
+    # Disassociate and delete route tables (except main)
+    log_info "Disassociating route tables..."
+    aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" \
+        --query 'RouteTables[?Associations[0].Main!=`true`].Associations[].RouteTableAssociationId' \
+        --output text 2>/dev/null | xargs -r -n1 aws ec2 disassociate-route-table --association-id 2>/dev/null || true
+    
     # Delete subnets
+    log_info "Deleting subnets..."
     aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query 'Subnets[*].SubnetId' --output text | xargs -r -n1 aws ec2 delete-subnet --subnet-id || true
     
     # Detach and delete IGW
+    log_info "Deleting Internet Gateway..."
     IGW_ID=$(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$VPC_ID" --query 'InternetGateways[0].InternetGatewayId' --output text)
     if [ -n "$IGW_ID" ] && [ "$IGW_ID" != "None" ]; then
         aws ec2 detach-internet-gateway --internet-gateway-id "$IGW_ID" --vpc-id "$VPC_ID" 2>/dev/null || true
+        sleep 5  # Wait for detachment
         aws ec2 delete-internet-gateway --internet-gateway-id "$IGW_ID" 2>/dev/null || true
     fi
     
     # Delete route tables (except main)
+    log_info "Deleting route tables..."
     aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" --query 'RouteTables[?Associations[0].Main!=`true`].RouteTableId' --output text | xargs -r -n1 aws ec2 delete-route-table --route-table-id || true
     
-    # Delete VPC
-    aws ec2 delete-vpc --vpc-id "$VPC_ID" 2>/dev/null || true
-    log_success "Network infrastructure deleted"
+    # Delete VPC with retries
+    log_info "Deleting VPC..."
+    MAX_RETRIES=10
+    RETRY_COUNT=0
+    VPC_DELETED=false
+    
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        if aws ec2 delete-vpc --vpc-id "$VPC_ID" 2>/dev/null; then
+            VPC_DELETED=true
+            log_success "VPC deleted"
+            break
+        else
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                log_info "VPC has dependencies, retrying in 10 seconds... (attempt $RETRY_COUNT/$MAX_RETRIES)"
+                sleep 10
+            fi
+        fi
+    done
+    
+    if [ "$VPC_DELETED" = false ]; then
+        log_warning "⚠️  VPC could not be deleted after $MAX_RETRIES attempts"
+        log_warning "Manual cleanup may be required: $VPC_ID"
+        echo ""
+    else
+        log_success "Network infrastructure deleted"
+    fi
+else
+    log_info "No VPC found to delete"
 fi
 
 # Phase 9: Cleanup state
