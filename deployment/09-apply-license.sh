@@ -132,7 +132,7 @@ expect {
 EOF_EXPECT
 )
 
-if echo "$CONTROLLER_RUNNING" | grep -q "controller.*Success"; then
+if echo "$CONTROLLER_RUNNING" | grep -iq "controller.*Success"; then
     log_success "Controller is running"
 else
     log_error "Controller is not running or not responding"
