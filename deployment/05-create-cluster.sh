@@ -220,21 +220,74 @@ echo ""
 log_success "All nodes are ready!"
 echo ""
 
-# Step 3: Add VM2/VM3 host keys to VM1's known_hosts
-log_info "Step 3: Adding VM2/VM3 host keys to VM1's known_hosts..."
+# Step 3: Setup SSH keys for VM1 -> VM2/VM3 communication
+log_info "Step 3: Setting up SSH keys for cluster init..."
 echo ""
 
-# Use password auth (bootstrap may have modified SSH keys)
+# Generate SSH key on VM1 if it doesn't exist
+log_info "Generating SSH key on VM1..."
 expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
 set timeout 30
-spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "ssh-keyscan -H ${VM2_PRIV} ${VM3_PRIV} >> ~/.ssh/known_hosts"
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N '' -q"
 expect {
     "password:" { send "${PASSWORD}\r"; exp_continue }
     eof
 }
 EOF_EXPECT
 
-log_success "Host keys added"
+# Get VM1's public key
+log_info "Retrieving VM1's public key..."
+VM1_PUBKEY=$(expect << EOF_EXPECT 2>&1 | grep "^ssh-ed25519" || echo ""
+set timeout 15
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "cat ~/.ssh/id_ed25519.pub"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+)
+
+if [[ -z "$VM1_PUBKEY" ]]; then
+    log_error "Failed to retrieve VM1's public key"
+    exit 1
+fi
+
+log_success "VM1 public key retrieved"
+
+# Copy VM1's public key to VM2
+log_info "Adding VM1's key to VM2's authorized_keys..."
+expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$(cat "state/team${TEAM_NUMBER}/vm2-public-ip.txt") "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${VM1_PUBKEY}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+
+# Copy VM1's public key to VM3
+log_info "Adding VM1's key to VM3's authorized_keys..."
+expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$(cat "state/team${TEAM_NUMBER}/vm3-public-ip.txt") "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${VM1_PUBKEY}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+
+# Add VM2/VM3 host keys to VM1's known_hosts
+log_info "Adding VM2/VM3 host keys to VM1's known_hosts..."
+expect << EOF_EXPECT 2>&1 | sed 's/^/  /'
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@${VM1_PUB} "ssh-keyscan -H ${VM2_PRIV} ${VM3_PRIV} >> ~/.ssh/known_hosts 2>/dev/null"
+expect {
+    "password:" { send "${PASSWORD}\r"; exp_continue }
+    eof
+}
+EOF_EXPECT
+
+log_success "SSH keys configured for cluster init"
 echo ""
 
 # Step 4: Create cluster
