@@ -203,14 +203,108 @@ fi
 
 if echo "$INSTALL_OUTPUT" | grep -qi "ERROR\|Connection.*timed out\|Connection refused"; then
     log_error "Installation command encountered errors"
+    
+    # Check for specific database lock errors
+    if echo "$INSTALL_OUTPUT" | grep -qi "database is locked"; then
+        log_error "Database lock detected during installation"
+        log_info ""
+        log_info "This usually means MySQL InnoDB cluster is still initializing."
+        log_info "To fix this issue:"
+        log_info "  1. SSH to VM1: ./scripts/ssh-vm1.sh --team $TEAM_NUMBER"
+        log_info "  2. Delete MySQL release: helm delete mysql -n mysql"
+        log_info "  3. Wait 30 seconds: sleep 30"
+        log_info "  4. Re-run installation: ./deployment/07-install.sh --team $TEAM_NUMBER"
+        log_info ""
+        log_info "Or manually check MySQL status:"
+        log_info "  kubectl get pods -n mysql"
+        log_info "  kubectl get pxc -n mysql"
+    fi
     exit 1
 fi
 
 log_success "Installation command completed"
 echo ""
 
-# Step 3: Wait and verify
-log_info "Step 3: Waiting for services to start (checking every 60 seconds)..."
+# Step 3: Wait for MySQL cluster to be ready
+log_info "Step 3: Waiting for MySQL InnoDB cluster to be ready..."
+log_warning "MySQL initialization can take 2-5 minutes..."
+echo ""
+
+MYSQL_READY=false
+MYSQL_MAX_WAIT=300  # 5 minutes
+MYSQL_ELAPSED=0
+
+while [ $MYSQL_ELAPSED -lt $MYSQL_MAX_WAIT ]; do
+    # Check MySQL pod status
+    MYSQL_STATUS=$(expect << 'EOF_MYSQL' 2>&1
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "kubectl get pods -n mysql -o json | jq -r '.items[] | select(.metadata.name | startswith(\"mysql-\")) | .status.phase + \" \" + (.status.containerStatuses[]?.ready // false | tostring)' 2>/dev/null || echo 'ERROR'"
+expect {
+    "password:" { 
+        send "$env(PASSWORD)\r"
+        exp_continue 
+    }
+    timeout {
+        puts "ERROR: Timeout"
+        exit 1
+    }
+    eof
+}
+EOF_MYSQL
+)
+    
+    # Count Running pods with all containers ready
+    READY_COUNT=$(echo "$MYSQL_STATUS" | grep -c "Running true" || echo "0")
+    TOTAL_PODS=$(echo "$MYSQL_STATUS" | grep -c "mysql-" || echo "0")
+    
+    if [ "$READY_COUNT" -ge 3 ]; then
+        # All 3 MySQL pods are running and ready
+        log_success "MySQL cluster is ready ($READY_COUNT/3 pods running)"
+        MYSQL_READY=true
+        break
+    else
+        echo "  MySQL pods: $READY_COUNT/$TOTAL_PODS ready... (${MYSQL_ELAPSED}s elapsed)"
+        sleep 10
+        MYSQL_ELAPSED=$((MYSQL_ELAPSED + 10))
+    fi
+done
+
+if [ "$MYSQL_READY" = false ]; then
+    log_warning "MySQL cluster did not become ready within ${MYSQL_MAX_WAIT}s"
+    log_warning "Installation will continue, but some services may fail"
+    log_info "You can check MySQL status manually:"
+    log_info "  ./scripts/ssh-vm1.sh --team $TEAM_NUMBER"
+    log_info "  kubectl get pods -n mysql"
+else
+    # Additional check: Verify PXC cluster status
+    PXC_STATUS=$(expect << 'EOF_PXC' 2>&1
+set timeout 30
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null appduser@$env(VM1_PUB) "kubectl get pxc -n mysql -o jsonpath='{.items[0].status.state}' 2>/dev/null || echo 'unknown'"
+expect {
+    "password:" { 
+        send "$env(PASSWORD)\r"
+        exp_continue 
+    }
+    timeout {
+        puts "ERROR: Timeout"
+        exit 1
+    }
+    eof
+}
+EOF_PXC
+)
+    
+    if echo "$PXC_STATUS" | grep -qi "ready"; then
+        log_success "MySQL InnoDB cluster status: Ready"
+    else
+        log_warning "MySQL InnoDB cluster status: $PXC_STATUS (may still be initializing)"
+    fi
+fi
+
+echo ""
+
+# Step 4: Wait and verify services
+log_info "Step 4: Waiting for services to start (checking every 60 seconds)..."
 echo ""
 
 SERVICES_READY=false
