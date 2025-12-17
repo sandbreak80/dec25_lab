@@ -57,14 +57,8 @@ fi
 load_team_config "$TEAM_NUMBER"
 check_aws_cli
 
-# Detect correct password based on whether password change was run
-if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
-    PASSWORD="AppDynamics123!"
-    log_info "Using changed password (AppDynamics123!)"
-else
-    PASSWORD="changeme"
-    log_info "Using default password (changeme - password change was skipped)"
-fi
+# Password is always changed to AppDynamics123! in step 3
+PASSWORD="AppDynamics123!"
 export PASSWORD
 
 log_info "Bootstrapping AppDynamics VMs for Team ${TEAM_NUMBER}..."

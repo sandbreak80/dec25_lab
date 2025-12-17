@@ -59,12 +59,8 @@ if ! command -v expect &> /dev/null; then
     exit 1
 fi
 
-# Detect correct password based on whether password change was run
-if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
-    PASSWORD="AppDynamics123!"
-else
-    PASSWORD="changeme"
-fi
+# Password is always AppDynamics123! (set in step 3)
+PASSWORD="AppDynamics123!"
 
 echo ""
 cat << EOF

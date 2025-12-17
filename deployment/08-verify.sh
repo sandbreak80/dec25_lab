@@ -21,12 +21,8 @@ load_team_config "$TEAM_NUMBER"
 
 VM1_PUB=$(cat "state/team${TEAM_NUMBER}/vm1-public-ip.txt")
 
-# Detect correct password based on whether password change was run
-if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
-    PASSWORD="AppDynamics123!"
-else
-    PASSWORD="changeme"
-fi
+# Password is always AppDynamics123! (set in step 3)
+PASSWORD="AppDynamics123!"
 export VM1_PUB PASSWORD
 
 # Check for expect
