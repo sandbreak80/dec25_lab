@@ -1,0 +1,196 @@
+# 🚀 AppDynamics Virtual Appliance Lab - Quick Start
+
+**Welcome!** This lab will guide you through deploying a complete AppDynamics on-premises environment on AWS.
+
+⚠️ **IMPORTANT:** This file contains your AWS credentials. **DO NOT commit this to Git or share publicly.**
+
+---
+
+## 🔑 Your AWS Credentials
+
+```
+AWS Access Key ID:     [YOUR_ACCESS_KEY_ID]
+AWS Secret Access Key: [YOUR_SECRET_ACCESS_KEY]
+AWS Region:            us-west-2
+AWS Account:           [YOUR_ACCOUNT_ID]
+IAM User:              lab-student
+```
+
+**⚠️ Security Notes:**
+- These credentials are shared by all students
+- Valid through: **[EXPIRATION_DATE]**
+- Never commit these to version control
+- Only works in us-west-2 region
+
+---
+
+## 📝 Your Team Assignment
+
+You are assigned: **Team [YOUR_NUMBER]**
+
+Your domain will be: `team[YOUR_NUMBER].splunkylabs.com`
+
+Available teams: 1, 2, 3, 4, or 5
+
+---
+
+## ⚡ Quick Start (3 Steps)
+
+### Step 1: Clone and Configure
+
+```bash
+# Clone the lab repository
+git clone https://github.com/sandbreak80/dec25_lab.git
+cd dec25_lab
+
+# Configure AWS CLI with credentials above
+aws configure
+# When prompted:
+#   AWS Access Key ID: [YOUR_ACCESS_KEY_ID]
+#   AWS Secret Access Key: [YOUR_SECRET_ACCESS_KEY]
+#   Default region: us-west-2
+#   Default output format: json
+
+# Verify access
+aws sts get-caller-identity
+# Should show: User "lab-student", Account "[YOUR_ACCOUNT_ID]"
+
+# Check prerequisites
+./scripts/check-prerequisites.sh
+```
+
+### Step 2: Deploy Your Lab
+
+**Replace `N` with your team number (1-5)**
+
+```bash
+# Run each script in order:
+./deployment/01-deploy.sh --team N          # 10 min - Create AWS infrastructure
+./deployment/02-change-password.sh --team N # 1 min  - Set VM password
+./deployment/03-setup-ssh-keys.sh --team N  # 1 min  - Configure SSH
+./deployment/04-bootstrap-vms.sh --team N   # 25 min - Extract AppD images
+./deployment/05-create-cluster.sh --team N  # 10 min - Create Kubernetes cluster
+./deployment/06-configure.sh --team N       # 1 min  - Configure AppDynamics
+./deployment/07-install.sh --team N         # 30 min - Install all AppD services
+./deployment/09-apply-license.sh --team N   # 1 min  - Apply license
+./deployment/08-verify.sh --team N          # 1 min  - Verify deployment
+```
+
+**Total Time:** ~45 minutes (fully automated)
+
+### Step 3: Access Your Environment
+
+```
+Controller:  https://controller-teamN.splunkylabs.com/controller/
+Events:      https://events-teamN.splunkylabs.com
+SecureApp:   https://secureapp-teamN.splunkylabs.com
+
+Username: admin
+Password: welcome
+```
+
+⚠️ **Change the admin password immediately after first login!**
+
+---
+
+## 🧹 Cleanup (IMPORTANT!)
+
+**Always run cleanup when finished to avoid AWS charges:**
+
+```bash
+./deployment/cleanup.sh --team N --confirm
+```
+
+This deletes all AWS resources for your team (~10 minutes).
+
+---
+
+## 📚 Complete Documentation
+
+For detailed information, see:
+
+| Document | Description |
+|----------|-------------|
+| **[README.md](README.md)** | Complete lab guide with all details |
+| **[docs/LAB_GUIDE.md](docs/LAB_GUIDE.md)** | Step-by-step deployment walkthrough |
+| **[docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** | Common commands and troubleshooting |
+| **[docs/DATABASE_LOCK_FIX.md](docs/DATABASE_LOCK_FIX.md)** | MySQL issue troubleshooting |
+| **[docs/RESOURCE_INVENTORY.md](docs/RESOURCE_INVENTORY.md)** | AWS resources created |
+
+---
+
+## 🔗 Official Documentation
+
+- **AppDynamics Virtual Appliance (AWS):** https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.7.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/amazon-web-services-aws
+- **AppD Virtual Appliance Repo:** https://github.com/Appdynamics/appd-virtual-appliance
+- **Lab Repository:** https://github.com/sandbreak80/dec25_lab
+
+---
+
+## 🆘 Quick Troubleshooting
+
+### Common Issues
+
+**"Permission denied (publickey)"**
+- Run: `./deployment/03-setup-ssh-keys.sh --team N`
+
+**"Bootstrap taking too long"**
+- Normal! Wait 20-25 minutes for VM bootstrap (extracting 15GB+ images)
+
+**"SecureApp shows Failed"**
+- Check actual pod status: `kubectl get pods -n cisco-secureapp` (ignore `appdcli ping`)
+
+**"Controller shows 503 after license"**
+- Normal! Controller restarts after license application (wait 5-10 min)
+
+**"Database is locked" error**
+- Script auto-retries. If it fails, re-run: `./deployment/07-install.sh --team N`
+
+**Need more help?**
+- See [README.md](README.md) troubleshooting section
+- Check `logs/teamN/` for detailed logs
+- Contact your instructor
+
+---
+
+## ✅ Prerequisites
+
+You need these tools installed:
+- AWS CLI v2 (`brew install awscli` or see [AWS docs](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html))
+- `jq` - JSON parser (`brew install jq`)
+- `expect` - SSH automation (`brew install expect`)
+- `git`, `ssh` (usually pre-installed)
+
+**Verify:** `./scripts/check-prerequisites.sh`
+
+---
+
+## ⚠️ Important Reminders
+
+- 🔢 Always use **your assigned team number** (1-5)
+- 🔒 **Never commit this file** to Git (contains credentials)
+- 🧹 **Always run cleanup** when finished
+- 🔐 **Change default passwords** immediately
+- 💬 **Ask for help** if stuck!
+
+---
+
+## 🎯 What You'll Deploy
+
+- ✅ 3 VMs running AppDynamics Virtual Appliance
+- ✅ 3-node Kubernetes cluster (MicroK8s)
+- ✅ AppDynamics Controller (APM)
+- ✅ Events Service, EUM, Synthetic Monitoring
+- ✅ AIOps, SecureApp, ATD
+- ✅ Application Load Balancer with SSL/TLS
+- ✅ Route 53 DNS records
+
+**Total AWS Cost:** ~$5-10 per team per day (tear down when not in use!)
+
+---
+
+**Questions?** Contact your instructor or see the [complete documentation](README.md).
+
+**Lab Repository:** https://github.com/sandbreak80/dec25_lab  
+**Last Updated:** December 17, 2025
+
