@@ -8,38 +8,33 @@ This guide explains how to distribute credentials to students for the AppDynamic
 
 ## Quick Setup
 
-### Step 1: Create Student Quick-Start File
+### Step 1: Customize for Each Student/Team
 
+The `START_HERE.md` file already has your AWS credentials embedded. To customize for each student:
+
+**Option A: Per-Team Files (Recommended)**
 ```bash
-# Copy the template
-cp START_HERE.md.template START_HERE.md
+# Create a customized file for Team 1
+sed 's/--team N/--team 1/g; s/teamN/team1/g' START_HERE.md > START_HERE_Team1.md
 
-# Edit with real credentials
-vi START_HERE.md  # or use your preferred editor
+# Or do it manually:
+cp START_HERE.md START_HERE_Team1.md
+# Find: N
+# Replace: 1 (their team number)
 ```
 
-### Step 2: Fill in Credentials
+**Option B: Let Students Replace Themselves**
+- Send `START_HERE.md` as-is
+- Students replace all instances of `N` with their team number
+- Simple find/replace in any text editor
 
-Replace these placeholders in `START_HERE.md`:
-
-| Placeholder | Real Value | Location |
-|-------------|------------|----------|
-| `[YOUR_ACCESS_KEY_ID]` | AWS Access Key ID | Lines 11, 38 |
-| `[YOUR_SECRET_ACCESS_KEY]` | AWS Secret Access Key | Lines 12, 39 |
-| `[YOUR_ACCOUNT_ID]` | AWS Account Number | Lines 14, 47 |
-| `[EXPIRATION_DATE]` | Credential expiry date | Line 19 |
-| `[YOUR_NUMBER]` | Team number (1-5) | Line 26 |
-
-**Example:**
+**Example Student Find/Replace:**
 ```
-# Before
-AWS Access Key ID:     [YOUR_ACCESS_KEY_ID]
-
-# After
-AWS Access Key ID:     AKIAUSTPCS7GG4F7PSBV
+Find:    N (in commands: --team N, teamN.splunkylabs.com, logs/teamN/)
+Replace: 3 (if they're Team 3)
 ```
 
-### Step 3: Distribute to Students
+### Step 2: Distribute to Students
 
 **Option A: Email** (Most Common)
 ```bash
@@ -77,19 +72,21 @@ AWS Access Key ID:     AKIAUSTPCS7GG4F7PSBV
 
 ## What Students Receive
 
-Students get a single file: **`START_HERE.md`**
+Students get a single file: **`START_HERE.md`** (or `START_HERE_TeamN.md`)
 
 This file contains:
-- ✅ Their AWS credentials (filled in by you)
-- ✅ Their team assignment (you specify)
+- ✅ AWS credentials (already embedded)
+- ✅ Placeholder `N` for team number (easy find/replace)
 - ✅ Quick 3-step deployment instructions
 - ✅ Links to complete documentation
 - ✅ Essential troubleshooting tips
 
-**Students do NOT need:**
-- `STUDENT_CREDENTIALS.txt` (obsolete - replaced by `START_HERE.md`)
-- Separate team assignment instructions
-- Separate credential files
+**What students do:**
+1. Open `START_HERE.md` in their text editor
+2. Find/Replace: `N` → their team number (1-5)
+3. Follow the instructions
+
+**Alternative:** Send them a pre-customized file (e.g., `START_HERE_Team3.md`) with `N` already replaced
 
 ---
 
