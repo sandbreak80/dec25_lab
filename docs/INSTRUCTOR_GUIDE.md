@@ -15,23 +15,30 @@ The `START_HERE.md` file already has your AWS credentials embedded. To customize
 **Option A: Per-Team Files (Recommended)**
 ```bash
 # Create a customized file for Team 1
-sed 's/--team N/--team 1/g; s/teamN/team1/g' START_HERE.md > START_HERE_Team1.md
+sed 's/\[your-team-number\]/1/g' START_HERE.md > START_HERE_Team1.md
 
-# Or do it manually:
-cp START_HERE.md START_HERE_Team1.md
-# Find: N
-# Replace: 1 (their team number)
+# Create files for all teams
+for team in 1 2 3 4 5; do
+  sed "s/\[your-team-number\]/$team/g" START_HERE.md > "START_HERE_Team${team}.md"
+done
 ```
 
-**Option B: Let Students Replace Themselves**
+**Option B: Let Students Replace Themselves** (Easiest)
 - Send `START_HERE.md` as-is
-- Students replace all instances of `N` with their team number
-- Simple find/replace in any text editor
+- Students do one find/replace: `[your-team-number]` → their team number
+- Safe placeholder that won't accidentally match other text
 
 **Example Student Find/Replace:**
 ```
-Find:    N (in commands: --team N, teamN.splunkylabs.com, logs/teamN/)
+Find:    [your-team-number]
 Replace: 3 (if they're Team 3)
+```
+
+**Result:** All commands and URLs updated in one operation:
+```
+--team [your-team-number] → --team 3
+team[your-team-number].splunkylabs.com → team3.splunkylabs.com
+logs/team[your-team-number]/ → logs/team3/
 ```
 
 ### Step 2: Distribute to Students
@@ -72,21 +79,26 @@ Replace: 3 (if they're Team 3)
 
 ## What Students Receive
 
-Students get a single file: **`START_HERE.md`** (or `START_HERE_TeamN.md`)
+Students get a single file: **`START_HERE.md`** (or `START_HERE_Team3.md`)
 
 This file contains:
 - ✅ AWS credentials (already embedded)
-- ✅ Placeholder `N` for team number (easy find/replace)
+- ✅ Placeholder `[your-team-number]` for team number (safe find/replace)
 - ✅ Quick 3-step deployment instructions
 - ✅ Links to complete documentation
 - ✅ Essential troubleshooting tips
 
 **What students do:**
 1. Open `START_HERE.md` in their text editor
-2. Find/Replace: `N` → their team number (1-5)
+2. Find/Replace: `[your-team-number]` → their team number (1-5)
 3. Follow the instructions
 
-**Alternative:** Send them a pre-customized file (e.g., `START_HERE_Team3.md`) with `N` already replaced
+**Why this placeholder?**
+- Safe: Won't accidentally match other text (like the letter "N")
+- Clear: Self-documenting what to replace
+- Easy: One find/replace updates everything
+
+**Alternative:** Send them a pre-customized file (e.g., `START_HERE_Team3.md`) with placeholder already replaced
 
 ---
 
