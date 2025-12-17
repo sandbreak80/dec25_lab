@@ -256,11 +256,33 @@ if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
     VPC_DELETED=false
     
     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-        if aws ec2 delete-vpc --vpc-id "$VPC_ID" >/dev/null 2>&1; then
+        # First check if VPC still exists
+        VPC_EXISTS=$(aws ec2 describe-vpcs --vpc-ids "$VPC_ID" --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "")
+        
+        if [ -z "$VPC_EXISTS" ] || [ "$VPC_EXISTS" = "None" ]; then
+            # VPC doesn't exist anymore - success!
+            VPC_DELETED=true
+            log_success "  VPC deleted"
+            break
+        fi
+        
+        # Try to delete the VPC
+        DELETE_OUTPUT=$(aws ec2 delete-vpc --vpc-id "$VPC_ID" 2>&1)
+        DELETE_EXIT=$?
+        
+        if [ $DELETE_EXIT -eq 0 ]; then
             VPC_DELETED=true
             log_success "  VPC deleted"
             break
         else
+            # Check if error is because VPC doesn't exist (already deleted)
+            if echo "$DELETE_OUTPUT" | grep -qi "InvalidVpcID.NotFound"; then
+                VPC_DELETED=true
+                log_success "  VPC deleted"
+                break
+            fi
+            
+            # VPC still has dependencies, retry
             RETRY_COUNT=$((RETRY_COUNT + 1))
             if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
                 log_info "  VPC has dependencies, retrying... (attempt $RETRY_COUNT/$MAX_RETRIES)"
@@ -273,6 +295,23 @@ if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
         log_warning "⚠️  VPC could not be deleted after $MAX_RETRIES attempts"
         log_warning "Manual cleanup may be required: $VPC_ID"
         echo ""
+        
+        # Show what dependencies remain
+        log_info "  Checking remaining VPC dependencies..."
+        REMAINING_DEPS=$(aws ec2 describe-vpcs --vpc-ids "$VPC_ID" 2>/dev/null | jq -r '.Vpcs[0] | if . then "VPC still exists" else "VPC not found" end' 2>/dev/null || echo "Unable to check")
+        log_info "  Status: $REMAINING_DEPS"
+        
+        # Check for remaining ENIs
+        REMAINING_ENIS=$(aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=$VPC_ID" --query 'NetworkInterfaces[*].NetworkInterfaceId' --output text 2>/dev/null || echo "")
+        if [ -n "$REMAINING_ENIS" ]; then
+            log_warning "  Remaining ENIs: $REMAINING_ENIS"
+        fi
+        
+        # Check for remaining security groups
+        REMAINING_SGS=$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC_ID" --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text 2>/dev/null || echo "")
+        if [ -n "$REMAINING_SGS" ]; then
+            log_warning "  Remaining security groups: $REMAINING_SGS"
+        fi
     else
         log_success "Network infrastructure deleted"
     fi
