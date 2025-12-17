@@ -22,18 +22,47 @@ echo "  4. Launch instance with ENI"
 echo ""
 
 # Get resources
+log_info "Loading resource IDs from previous phases..."
 VPC_ID=$(load_resource_id vpc "$TEAM_NUMBER")
 SUBNET_ID=$(load_resource_id subnet "$TEAM_NUMBER")
 VM_SG_ID=$(load_resource_id vm-sg "$TEAM_NUMBER")
 
+# Validate required resources exist
+if [ -z "$VPC_ID" ] || [ "$VPC_ID" == "None" ]; then
+    log_error "VPC not found. Did Phase 1 (network creation) complete successfully?"
+    log_info "Expected state file: state/team${TEAM_NUMBER}/vpc.id"
+    log_info "Try running: ./deployment/01-deploy.sh --team ${TEAM_NUMBER}"
+    exit 1
+fi
+
+if [ -z "$SUBNET_ID" ] || [ "$SUBNET_ID" == "None" ]; then
+    log_error "Subnet not found. Did Phase 1 (network creation) complete successfully?"
+    log_info "Expected state file: state/team${TEAM_NUMBER}/subnet.id"
+    log_info "Try running: ./deployment/01-deploy.sh --team ${TEAM_NUMBER}"
+    exit 1
+fi
+
+if [ -z "$VM_SG_ID" ] || [ "$VM_SG_ID" == "None" ]; then
+    log_error "Security Group not found. Did Phase 2 (security group creation) complete successfully?"
+    log_info "Expected state file: state/team${TEAM_NUMBER}/vm-sg.id"
+    log_info "Try running: ./deployment/01-deploy.sh --team ${TEAM_NUMBER}"
+    exit 1
+fi
+
+log_success "All prerequisite resources found!"
+
 # Get AMI ID (shared across all teams)
+log_info "Loading AMI ID..."
 AMI_ID=$(cat "state/shared/ami.id" 2>/dev/null)
 if [ -z "$AMI_ID" ] || [ "$AMI_ID" == "None" ]; then
     log_error "AMI not found. Contact instructor."
+    log_info "Expected state file: state/shared/ami.id"
+    log_info "The instructor must provide the AppDynamics Virtual Appliance AMI ID."
     exit 1
 fi
 
 log_info "Using AMI: $AMI_ID"
+log_info "VPC: $VPC_ID"
 log_info "Subnet: $SUBNET_ID"
 log_info "Security Group: $VM_SG_ID"
 echo ""
