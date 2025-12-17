@@ -63,14 +63,10 @@ fi
 load_team_config "$TEAM_NUMBER"
 check_aws_cli
 
-# Detect correct password if not provided as argument
+# Password is always changed to AppDynamics123! in step 2
+# (unless overridden by --password argument)
 if [ "$PASSWORD" = "AppDynamics123!" ]; then
-    # Default was not changed by --password argument, so auto-detect
-    if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
-        PASSWORD="AppDynamics123!"
-    else
-        PASSWORD="changeme"
-    fi
+    PASSWORD="AppDynamics123!"
 fi
 
 # Check for expect

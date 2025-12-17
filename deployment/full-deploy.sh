@@ -37,27 +37,21 @@ Required:
     --team, -t NUMBER    Team number (1-5)
 
 Options:
-    --skip-password-change    Skip password change step (use default)
-    --skip-ssh-keys          Skip SSH key setup (use password auth only)
-    --skip-verify            Skip final verification step
-    --help, -h               Show this help
+    --skip-verify        Skip final verification step (for testing)
+    --help, -h           Show this help
 
 Example:
-    # Full deployment with all steps
+    # Full deployment (all steps automated)
     $0 --team 5
 
-    # Deployment skipping password change (faster for testing)
-    $0 --team 5 --skip-password-change
-
-Note: This script is fully non-interactive and takes 70-80 minutes.
+Note: This script is fully non-interactive and takes 67-77 minutes.
+      All steps including password change and SSH setup are automated.
 
 EOF
 }
 
 # Parse arguments
 TEAM_NUMBER=""
-SKIP_PASSWORD_CHANGE=false
-SKIP_SSH_KEYS=false
 SKIP_VERIFY=false
 
 while [[ $# -gt 0 ]]; do
@@ -65,14 +59,6 @@ while [[ $# -gt 0 ]]; do
         -t|--team)
             TEAM_NUMBER="$2"
             shift 2
-            ;;
-        --skip-password-change)
-            SKIP_PASSWORD_CHANGE=true
-            shift
-            ;;
-        --skip-ssh-keys)
-            SKIP_SSH_KEYS=true
-            shift
             ;;
         --skip-verify)
             SKIP_VERIFY=true
@@ -143,15 +129,9 @@ log_info "Log file: $DEPLOY_LOG"
 log_info "Estimated time: 70-80 minutes"
 echo ""
 
-if [ "$SKIP_PASSWORD_CHANGE" = true ]; then
-    log_warning "Password change will be SKIPPED (using default: changeme)"
-fi
-if [ "$SKIP_SSH_KEYS" = true ]; then
-    log_warning "SSH key setup will be SKIPPED (using password auth)"
-fi
-
 echo ""
-log_warning "This is a NON-INTERACTIVE deployment. Do not interrupt!"
+log_warning "This is a 100% automated deployment. Do not interrupt!"
+log_info "All steps are automated with no user interaction required."
 echo ""
 sleep 3
 
@@ -200,34 +180,16 @@ run_step 2 "Deploy Infrastructure (VPC, Subnets, Security Groups, VMs, ALB, DNS)
     "${SCRIPT_DIR}/01-deploy.sh" --team "$TEAM_NUMBER"
 
 # =============================================================================
-# STEP 3: Change Password (OPTIONAL - can be skipped for testing)
+# STEP 3: Change Password (Required - VM forces password change on first login)
 # =============================================================================
-if [ "$SKIP_PASSWORD_CHANGE" = false ]; then
-    run_step 3 "Change VM Password" \
-        "${SCRIPT_DIR}/02-change-password.sh" --team "$TEAM_NUMBER"
-else
-    echo "" | tee -a "$DEPLOY_LOG"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | tee -a "$DEPLOY_LOG"
-    log_both "${MAGENTA}${BOLD}[3/10] Change VM Password${NC}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | tee -a "$DEPLOY_LOG"
-    log_both "${YELLOW}⏭️  SKIPPED (using default password: changeme)${NC}"
-fi
+run_step 3 "Change VM Password (Automated)" \
+    "${SCRIPT_DIR}/02-change-password.sh" --team "$TEAM_NUMBER"
 
 # =============================================================================
-# STEP 4: Setup SSH Keys (OPTIONAL - can be skipped, password auth works)
+# STEP 4: Setup SSH Keys (Automated - enables passwordless access)
 # =============================================================================
-if [ "$SKIP_SSH_KEYS" = false ]; then
-    run_step 4 "Setup SSH Keys (Optional)" \
-        "${SCRIPT_DIR}/03-setup-ssh-keys.sh" --team "$TEAM_NUMBER" || {
-        log_warning "SSH key setup failed, continuing with password auth..."
-    }
-else
-    echo "" | tee -a "$DEPLOY_LOG"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | tee -a "$DEPLOY_LOG"
-    log_both "${MAGENTA}${BOLD}[4/10] Setup SSH Keys${NC}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | tee -a "$DEPLOY_LOG"
-    log_both "${YELLOW}⏭️  SKIPPED (using password authentication)${NC}"
-fi
+run_step 4 "Setup SSH Keys (Automated)" \
+    "${SCRIPT_DIR}/03-setup-ssh-keys.sh" --team "$TEAM_NUMBER"
 
 # =============================================================================
 # STEP 5: Bootstrap VMs (15-20 minutes)

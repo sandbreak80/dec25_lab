@@ -55,12 +55,8 @@ fi
 load_team_config "$TEAM_NUMBER"
 check_aws_cli
 
-# Detect correct password based on whether password change was run
-if [ -f "state/team${TEAM_NUMBER}/password-changed.flag" ]; then
-    PASSWORD="AppDynamics123!"
-else
-    PASSWORD="changeme"
-fi
+# Password is always AppDynamics123! (set in step 3)
+PASSWORD="AppDynamics123!"
 
 # Check if SSH key is configured (for informational purposes only)
 KEY_PATH=$(cat "state/team${TEAM_NUMBER}/ssh-key-path.txt" 2>/dev/null || echo "")
