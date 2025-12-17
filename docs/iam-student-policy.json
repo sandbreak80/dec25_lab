@@ -20,10 +20,13 @@
         "ec2:CreateSecurityGroup",
         "ec2:CreateSubnet",
         "ec2:CreateTags",
+        "ec2:CreateSnapshot",
+        "ec2:CreateVolume",
         "ec2:CreateVpc",
         "ec2:DeleteInternetGateway",
         "ec2:DeleteKeyPair",
         "ec2:DeleteNetworkInterface",
+        "ec2:DeleteSnapshot",
         "ec2:DeleteRoute",
         "ec2:DeleteRouteTable",
         "ec2:DeleteSecurityGroup",
@@ -41,22 +44,23 @@
         "ec2:DescribeRouteTables",
         "ec2:DescribeSecurityGroups",
         "ec2:DescribeSecurityGroupRules",
+        "ec2:DescribeSnapshots",
         "ec2:DescribeSubnets",
         "ec2:DescribeVolumes",
         "ec2:DescribeVpcs",
+        "ec2:DescribeVpcAttribute",
         "ec2:DetachInternetGateway",
         "ec2:DetachNetworkInterface",
         "ec2:DisassociateAddress",
         "ec2:DisassociateRouteTable",
-        "ec2:ModifySubnetAttribute",
         "ec2:ModifyVpcAttribute",
         "ec2:ReleaseAddress",
         "ec2:RevokeSecurityGroupEgress",
         "ec2:RevokeSecurityGroupIngress",
-        "ec2:RunInstances",
         "ec2:StartInstances",
         "ec2:StopInstances",
-        "ec2:TerminateInstances"
+        "ec2:TerminateInstances",
+        "ec2:DeleteVolume"
       ],
       "Resource": "*",
       "Condition": {
@@ -66,16 +70,24 @@
       }
     },
     {
-      "Sid": "EC2InstanceTypeLimitation",
+      "Sid": "EC2RunInstancesWithTypeRestriction",
       "Effect": "Allow",
       "Action": "ec2:RunInstances",
-      "Resource": "arn:aws:ec2:us-west-2:*:instance/*",
+      "Resource": [
+        "arn:aws:ec2:us-west-2:*:instance/*",
+        "arn:aws:ec2:us-west-2:*:volume/*",
+        "arn:aws:ec2:us-west-2:*:network-interface/*",
+        "arn:aws:ec2:us-west-2:*:subnet/*",
+        "arn:aws:ec2:us-west-2:*:security-group/*",
+        "arn:aws:ec2:*:image/*"
+      ],
       "Condition": {
         "StringEquals": {
           "ec2:InstanceType": [
             "m5a.xlarge",
             "m5a.2xlarge",
-            "m5a.4xlarge"
+            "m5a.4xlarge",
+            "t3.2xlarge"
           ]
         }
       }
@@ -98,7 +110,6 @@
         "elasticloadbalancing:DescribeTargetHealth",
         "elasticloadbalancing:ModifyListener",
         "elasticloadbalancing:ModifyLoadBalancerAttributes",
-        "elasticloadbalancing:ModifyTargetGroup",
         "elasticloadbalancing:RegisterTargets",
         "elasticloadbalancing:RemoveTags",
         "elasticloadbalancing:SetSecurityGroups"
@@ -148,18 +159,6 @@
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"
-    },
-    {
-      "Sid": "S3LabResourcesReadAccess",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:ListBucket"
-      ],
-      "Resource": [
-        "arn:aws:s3:::appdynamics-lab-resources",
-        "arn:aws:s3:::appdynamics-lab-resources/*"
-      ]
     }
   ]
 }
