@@ -19,6 +19,8 @@ license.lic
 
 # Deployment State
 state/
+!state/shared/
+!state/shared/ami.id
 logs/
 *.log
 
