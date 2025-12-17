@@ -91,16 +91,24 @@ appdos:
 USER_DATA_EOF
         
         log_info "  [1/5] Creating Elastic Network Interface..."
-        ENI_ID=$(aws ec2 create-network-interface \
+        ENI_OUTPUT=$(aws ec2 create-network-interface \
             --subnet-id "$SUBNET_ID" \
             --description "Team ${TEAM_NUMBER} VM${i} Network Interface" \
             --groups "$VM_SG_ID" \
             --tag-specifications "ResourceType=network-interface,Tags=[{Key=Name,Value=${VM_NAME}-eni},{Key=Team,Value=team${TEAM_NUMBER}}]" \
             --query 'NetworkInterface.NetworkInterfaceId' \
-            --output text)
+            --output text 2>&1)
         
-        if [ -z "$ENI_ID" ] || [ "$ENI_ID" == "None" ]; then
+        ENI_ID=$(echo "$ENI_OUTPUT" | tail -1)
+        
+        if [ -z "$ENI_ID" ] || [ "$ENI_ID" == "None" ] || echo "$ENI_ID" | grep -q "UnauthorizedOperation"; then
             log_error "Failed to create ENI"
+            if echo "$ENI_OUTPUT" | grep -q "UnauthorizedOperation"; then
+                log_error "IAM Permission Error: User 'lab-student' is not authorized to perform: ec2:CreateNetworkInterface"
+                log_info "Contact your instructor to update IAM policy with the latest permissions."
+            else
+                echo "Error details: $ENI_OUTPUT"
+            fi
             exit 1
         fi
         log_success "  ENI created: $ENI_ID"
@@ -144,7 +152,7 @@ USER_DATA_EOF
         # CRITICAL: Use vendor disk configuration
         # - /dev/sda1: OS disk (delete on termination)
         # - /dev/sdb: Data disk (PRESERVE on termination!)
-        INSTANCE_ID=$(aws ec2 run-instances \
+        INSTANCE_OUTPUT=$(aws ec2 run-instances \
             --image-id "$AMI_ID" \
             --instance-type "$VM_TYPE" \
             --network-interfaces "[{\"NetworkInterfaceId\":\"${ENI_ID}\",\"DeviceIndex\":0}]" \
@@ -155,14 +163,36 @@ USER_DATA_EOF
             --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$VM_NAME},{Key=Team,Value=team${TEAM_NUMBER}}]" \
             --no-cli-pager \
             --query 'Instances[0].InstanceId' \
-            --output text)
+            --output text 2>&1)
+        
+        INSTANCE_ID=$(echo "$INSTANCE_OUTPUT" | tail -1)
         
         # Clean up user-data file
         rm -f /tmp/user-data-vm${i}.txt
         
-        if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
+        if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ] || echo "$INSTANCE_ID" | grep -q "UnauthorizedOperation"; then
             log_error "Failed to launch instance"
+            
+            if echo "$INSTANCE_OUTPUT" | grep -q "UnauthorizedOperation"; then
+                log_error "IAM Permission Error: User 'lab-student' is not authorized to perform: ec2:RunInstances"
+                log_info ""
+                log_info "This error occurs when IAM policy is missing required RunInstances permissions."
+                log_info "RunInstances requires permissions for multiple resource types:"
+                log_info "  - ec2:instance/*"
+                log_info "  - ec2:volume/*"
+                log_info "  - ec2:network-interface/*"
+                log_info "  - ec2:subnet/*"
+                log_info "  - ec2:security-group/*"
+                log_info "  - ec2:image/*"
+                log_info ""
+                log_info "📧 Contact your instructor with this error message."
+                log_info "📄 Instructor: Update IAM policy using docs/iam-student-policy.json"
+            else
+                echo "Error details: $INSTANCE_OUTPUT"
+            fi
+            
             # Clean up
+            log_info "Cleaning up resources..."
             aws ec2 disassociate-address --association-id "$ASSOCIATION_ID" 2>/dev/null || true
             aws ec2 release-address --allocation-id "$ALLOCATION_ID" 2>/dev/null || true
             aws ec2 delete-network-interface --network-interface-id "$ENI_ID" 2>/dev/null || true
