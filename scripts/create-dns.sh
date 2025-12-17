@@ -76,7 +76,7 @@ EOF
 log_info "Creating DNS records in Route 53..."
 aws route53 change-resource-record-sets \
     --hosted-zone-id "$HOSTED_ZONE_ID" \
-    --change-batch "file:///tmp/dns-team${TEAM_NUMBER}.json"
+    --change-batch "file:///tmp/dns-team${TEAM_NUMBER}.json" >/dev/null 2>&1
 
 log_success "DNS records created!"
 log_info "Controller:  https://controller-team${TEAM_NUMBER}.splunkylabs.com/controller/"

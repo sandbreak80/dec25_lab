@@ -70,6 +70,6 @@ EOF
 
 aws route53 change-resource-record-sets \
     --hosted-zone-id "$HOSTED_ZONE_ID" \
-    --change-batch "file:///tmp/dns-delete-team${TEAM_NUMBER}.json" 2>/dev/null || true
+    --change-batch "file:///tmp/dns-delete-team${TEAM_NUMBER}.json" >/dev/null 2>&1 || true
 
 log_success "DNS records removed"
