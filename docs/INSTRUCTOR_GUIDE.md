@@ -1,441 +1,273 @@
-# Instructor Guide - AppDynamics Multi-Team Lab
+# Instructor Guide - Student Credential Distribution
 
-> **For Instructors Only**: Complete setup and management guide.
+## Overview
 
----
-
-## 🎯 Lab Overview
-
-**Duration**: 60-90 minutes  
-**Students**: 20 (5 teams of 4)  
-**AWS Cost**: ~$50-100 per day (all teams)  
-**Cleanup**: Teams delete their own infrastructure
-
-### What Students Learn
-
-1. AWS Infrastructure Deployment (VPC, EC2, ALB, Route 53)
-2. AppDynamics On-Premises Installation
-3. Kubernetes/MicroK8s cluster creation
-4. SSL/TLS certificate management (AWS ACM)
-5. DNS configuration
-6. Security best practices (VPN-only access)
-7. Service health monitoring
+This guide explains how to distribute credentials to students for the AppDynamics Virtual Appliance lab.
 
 ---
 
-## 📋 Prerequisites
+## Quick Setup
 
-### AWS Account Setup
+### Step 1: Create Student Quick-Start File
 
-1. **AWS Account** with sufficient limits:
-   - EC2 instances: 15 (3 per team)
-   - Elastic IPs: 15
-   - VPCs: 5
-   - Application Load Balancers: 5
-   - Route 53 Hosted Zone: 1 (shared)
+```bash
+# Copy the template
+cp START_HERE.md.template START_HERE.md
 
-2. **IAM Permissions**:
-   - EC2 (full)
-   - VPC (full)
-   - ELB (full)
-   - Route 53 (full)
-   - ACM (full)
-   - S3 (limited to lab bucket)
-
-3. **AWS CLI** installed and configured
-
-4. **Domain**: Register domain (e.g., `splunkylabs.com`) in Route 53
-
-### Student Access
-
-Create 5 IAM users (one per team) with:
-```
-- EC2: Full access to their team's resources only
-- VPC: Full access to their team's VPC only
-- Route 53: Record management in shared hosted zone
-- ACM: Certificate management for their subdomain
+# Edit with real credentials
+vi START_HERE.md  # or use your preferred editor
 ```
 
-Use resource tags to isolate teams:
+### Step 2: Fill in Credentials
+
+Replace these placeholders in `START_HERE.md`:
+
+| Placeholder | Real Value | Location |
+|-------------|------------|----------|
+| `[YOUR_ACCESS_KEY_ID]` | AWS Access Key ID | Lines 11, 38 |
+| `[YOUR_SECRET_ACCESS_KEY]` | AWS Secret Access Key | Lines 12, 39 |
+| `[YOUR_ACCOUNT_ID]` | AWS Account Number | Lines 14, 47 |
+| `[EXPIRATION_DATE]` | Credential expiry date | Line 19 |
+| `[YOUR_NUMBER]` | Team number (1-5) | Line 26 |
+
+**Example:**
 ```
-Team: team1, team2, team3, team4, team5
+# Before
+AWS Access Key ID:     [YOUR_ACCESS_KEY_ID]
+
+# After
+AWS Access Key ID:     AKIAUSTPCS7GG4F7PSBV
 ```
 
-### Network Setup
+### Step 3: Distribute to Students
 
-Students **must** be on Cisco VPN for SSH access. The security groups are pre-configured with Cisco VPN egress IPs:
+**Option A: Email** (Most Common)
+```bash
+# Attach START_HERE.md to email
+# Subject: AppDynamics Lab - Team [N] Credentials
+# Body: Attached is your quick-start guide with credentials
+```
 
-- US-West: `151.186.183.24/32`, `151.186.183.87/32`
-- US-East: `151.186.182.23/32`, `151.186.182.87/32`
-- Shared: `151.186.192.0/20`
+**Option B: LMS Upload**
+- Upload `START_HERE.md` to your Learning Management System
+- Make it downloadable only (not viewable in browser)
 
-**Test VPN access before lab!**
+**Option C: Secure File Share**
+- Upload to Google Drive / OneDrive / Dropbox
+- Set to "View Only" with download enabled
+- Share link with students
 
 ---
 
-## 🚀 Pre-Lab Setup (1-2 hours)
+## Security Best Practices
 
-### 1. Prepare AWS Environment
+### ✅ DO:
+- Create a unique `START_HERE.md` for each class/cohort
+- Rotate credentials after each lab session
+- Set AWS budget alerts for the lab account
+- Remind students to clean up resources
+
+### ❌ DON'T:
+- Commit `START_HERE.md` to Git (it's in `.gitignore` for this reason)
+- Share credentials via Slack/Teams/public channels
+- Reuse the same credentials across multiple cohorts
+- Forget to delete IAM users after lab ends
+
+---
+
+## What Students Receive
+
+Students get a single file: **`START_HERE.md`**
+
+This file contains:
+- ✅ Their AWS credentials (filled in by you)
+- ✅ Their team assignment (you specify)
+- ✅ Quick 3-step deployment instructions
+- ✅ Links to complete documentation
+- ✅ Essential troubleshooting tips
+
+**Students do NOT need:**
+- `STUDENT_CREDENTIALS.txt` (obsolete - replaced by `START_HERE.md`)
+- Separate team assignment instructions
+- Separate credential files
+
+---
+
+## Team Assignments
+
+Assign teams based on class size:
+
+| Class Size | Teams to Use | Example Distribution |
+|------------|--------------|---------------------|
+| 1-5 students | Teams 1-5 | 1 student per team |
+| 6-10 students | Teams 1-5 | 2 students per team |
+| 11-15 students | Teams 1-5 | 3 students per team |
+| 16-20 students | Teams 1-5 | 4 students per team |
+
+**Recommendation:** Keep 2-4 students per team for collaboration.
+
+---
+
+## Pre-Lab Checklist
+
+Before distributing credentials:
+
+- [ ] IAM user `lab-student` exists with proper permissions
+- [ ] Access keys generated for `lab-student`
+- [ ] License file uploaded to S3: `s3://appdynamics-lab-resources/shared/license.lic`
+- [ ] AMI ID populated in `state/shared/ami.id`
+- [ ] Route 53 hosted zone configured: `splunkylabs.com`
+- [ ] SSL certificate available in ACM
+- [ ] AWS budget alerts configured
+- [ ] Service quotas checked (15 EC2 instances, 240 vCPUs, 15 EIPs)
+
+---
+
+## Post-Lab Cleanup
+
+After the lab session:
+
+### Step 1: Verify All Teams Cleaned Up
 
 ```bash
-# Clone/download this repository
-git clone <repo-url>
-cd deploy/aws
-
-# Verify AWS CLI access
-aws sts get-caller-identity
-
-# Create S3 bucket for AMI import (shared across teams)
-aws s3 mb s3://appd-va-lab-images-<unique-id> --region us-west-2
-
-# Register domain (if not already done)
-# Manual: Route 53 console
-```
-
-### 2. Upload AppDynamics AMI
-
-Download AMI from AppDynamics portal:
-
-```bash
-# Upload to S3 (one time, all teams share)
-aws s3 cp appd_va_25.4.0.2016.ami s3://appd-va-lab-images-<unique-id>/
-
-# Import snapshot (one time)
-# See docs/QUICK_REFERENCE.md for import commands
-
-# Share AMI with student accounts (or keep in shared account)
-```
-
-**AMI ID**: Save this - students need it in their config files
-
-### 3. Create Team Config Files
-
-Already done! See `config/team1.cfg` through `config/team5.cfg`
-
-Verify each team config has:
-- Unique CIDR block
-- Unique subdomain
-- Correct AMI ID
-- Correct S3 bucket name
-
-### 4. Create Student Credentials
-
-```bash
-# Create IAM users
-for i in {1..5}; do
-  aws iam create-user --user-name lab-team$i
-  aws iam create-access-key --user-name lab-team$i > team$i-credentials.json
+# Check for remaining resources
+for team in 1 2 3 4 5; do
+  echo "=== Team $team ==="
+  aws ec2 describe-instances \
+    --filters "Name=tag:Team,Values=team$team" \
+    --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' \
+    --output table
 done
-
-# Attach team-specific policies (use tags for isolation)
 ```
 
-**Distribute credentials securely** (not via email!)
-
-### 5. Request AppDynamics Licenses
-
-Contact AppDynamics licensing:
-- Email: licensing-help@appdynamics.com
-- Request: 5 lab licenses (small, temporary)
-- Include: Your company, use case, duration
-
-**You'll get 5 `license.lic` files** - one per team.
-
-### 6. Test Deployment (Dry Run)
+### Step 2: Force Cleanup (if needed)
 
 ```bash
-# Test with team1 config
-./lab-deploy.sh config/team1.cfg
-
-# Verify everything works
-./appd-check-health.sh config/team1.cfg
-
-# Cleanup test
-./lab-cleanup.sh config/team1.cfg
+# If students forgot to clean up
+for team in 1 2 3 4 5; do
+  ./deployment/cleanup.sh --team $team --confirm
+done
 ```
 
----
-
-## 👥 Day of Lab
-
-### 30 Minutes Before
-
-1. **Verify VPN** is accessible for students
-2. **Test AWS access** for each team
-3. **Confirm domain/DNS** is working
-4. **Check AWS limits** (EC2, EIPs, VPCs)
-5. **Prepare licenses** (5 files ready to distribute)
-
-### Lab Start (10 min)
-
-1. **Introduce Lab**:
-   - Objectives
-   - Architecture diagram (docs/ARCHITECTURE.md)
-   - Time expectations
-   - Team assignments
-
-2. **Distribute Credentials**:
-   - AWS access keys (per team)
-   - AppDynamics license files (per team)
-   - Team config file assignments
-
-3. **Verify VPN**:
-   - All students connect to Cisco VPN
-   - Test with: `curl ifconfig.me` (should show `151.186.183.*` or similar)
-
-4. **Clone Repository**:
-   ```bash
-   git clone <repo-url>
-   cd appd-virtual-appliance/deploy/aws
-   ```
-
-5. **Show README**:
-   - Walk through `README.md`
-   - Point out 6 simple scripts
-   - Show docs folder
-
-### During Lab (60 min)
-
-**Let students work independently**, but monitor:
+### Step 3: Rotate Credentials
 
 ```bash
-# Watch all team deployments (from your admin account)
-watch -n 30 'aws ec2 describe-instances \
-  --filters "Name=tag:Project,Values=appd-lab" \
-  --query "Reservations[].Instances[].[Tags[?Key==`Team`].Value|[0],State.Name,PublicIpAddress]" \
-  --output table'
+# Delete old access keys
+aws iam delete-access-key --user-name lab-student --access-key-id AKIA...
+
+# Create new access keys for next cohort
+aws iam create-access-key --user-name lab-student > new-credentials.json
 ```
 
-**Common Issues**:
-
-| Issue | Solution |
-|-------|----------|
-| SSH timeout | Check VPN connection (`curl ifconfig.me`) |
-| AMI not found | Verify AMI ID in config file |
-| VPC limit | Check AWS service quotas |
-| DNS not resolving | Wait 2-3 minutes for propagation |
-| secrets.yaml permission denied | Run `sudo chmod 644 /var/appd/config/secrets.yaml` |
-| `appdcli start appd small` fails | Retry once (known GPG key issue) |
-
-### Lab End (20 min)
-
-1. **Verify Completion**:
-   - All teams access their Controller UI
-   - All services show "Success" in `appdcli ping`
-   - SecureApp installed (if time permits)
-
-2. **Cleanup**:
-   ```bash
-   # Each team runs
-   ./lab-cleanup.sh config/team1.cfg
-   ```
-
-3. **Verify Cleanup**:
-   ```bash
-   # Check no instances remain
-   aws ec2 describe-instances \
-     --filters "Name=tag:Project,Values=appd-lab" \
-     --query "Reservations[].Instances[].State.Name"
-   ```
-
-4. **Debrief** (5 min):
-   - What did you learn?
-   - Challenges?
-   - Real-world applications?
-
----
-
-## 💰 Cost Management
-
-### Estimated Costs (us-west-2)
-
-Per Team:
-- 3x t3.2xlarge (8 vCPU, 32GB RAM): $0.33/hr × 3 = $0.99/hr
-- 3x Elastic IPs: $0.005/hr × 3 = $0.015/hr
-- ALB: $0.0225/hr
-- Data transfer: ~$0.10/hr
-- **Total per team**: ~$1.13/hr
-
-All 5 Teams:
-- **Per hour**: $5.65/hr
-- **4 hour lab**: ~$23
-- **Full day**: ~$135
-
-**Cost Savings**:
-- Use spot instances (not recommended for lab)
-- Smaller instances (t3.xlarge) - may be too small
-- Turn off when not in use
-
-### Cleanup Verification
+### Step 4: Delete IAM User (Optional)
 
 ```bash
-# Verify no running instances
-aws ec2 describe-instances --filters "Name=instance-state-name,Values=running"
-
-# Verify no EIPs
-aws ec2 describe-addresses
-
-# Verify no ALBs
-aws elbv2 describe-load-balancers
-
-# Check billing dashboard
+# If lab is completely done
+aws iam delete-access-key --user-name lab-student --access-key-id AKIA...
+aws iam remove-user-from-group --user-name lab-student --group-name AppDynamicsLabStudents
+aws iam delete-user --user-name lab-student
 ```
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting Student Issues
 
-### Student Can't SSH
+### "Can't clone the repository"
 
-1. Check VPN: `curl ifconfig.me` → Should show `151.186.*`
-2. Check security group: `scripts/check-status.sh config/team1.cfg`
-3. Manually add IP:
-   ```bash
-   SG_ID=$(aws ec2 describe-instances --filters "Name=tag:Team,Values=team1" \
-     --query "Reservations[0].Instances[0].SecurityGroups[0].GroupId" --output text)
-   
-   STUDENT_IP=$(curl -s ifconfig.me)
-   
-   aws ec2 authorize-security-group-ingress \
-     --group-id $SG_ID \
-     --protocol tcp --port 22 \
-     --cidr $STUDENT_IP/32
-   ```
-
-### Deployment Fails
-
+**Solution:** Students need Git installed
 ```bash
-# Check logs
-./lab-deploy.sh config/team1.cfg 2>&1 | tee deploy.log
+# macOS
+brew install git
 
-# Verify AWS credentials
+# Linux
+sudo apt install git
+```
+
+### "AWS CLI not found"
+
+**Solution:** Students need AWS CLI v2
+```bash
+# macOS
+brew install awscli
+
+# Linux
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+```
+
+### "Access Denied" errors
+
+**Possible causes:**
+1. Credentials not configured correctly (`aws configure`)
+2. IAM policy missing permissions (check `docs/iam-student-policy.json`)
+3. Credentials expired or rotated
+
+**Verify:**
+```bash
 aws sts get-caller-identity
-
-# Check service limits
-aws service-quotas get-service-quota \
-  --service-code ec2 \
-  --quota-code L-1216C47A  # Running On-Demand instances
+# Should show: User "lab-student"
 ```
 
-### AppDynamics Installation Fails
+### "VPC already exists"
 
+**Cause:** Student's previous deployment wasn't cleaned up
+
+**Solution:**
 ```bash
-# SSH to primary VM
-ssh appduser@<vm1-ip>
+# Student runs cleanup
+./deployment/cleanup.sh --team N --confirm
 
-# Check cluster status
-appdctl show cluster
-
-# Check pod status
-kubectl get pods --all-namespaces
-
-# Retry installation
-appdcli start appd small
-
-# Check logs
-kubectl logs -n cisco-controller <pod-name>
+# Or instructor force-cleans
+AWS_PROFILE=admin ./deployment/cleanup.sh --team N --confirm
 ```
 
-### SSL Certificate Issues
+---
 
-Browser shows self-signed cert:
+## Cost Management
 
-1. **Check ACM certificate**:
+### Expected Costs
+
+| Resource | Cost per Team per Day | 5 Teams Total |
+|----------|----------------------|---------------|
+| EC2 (3 × r5.4xlarge) | $6-8 | $30-40 |
+| EBS Storage | $1-2 | $5-10 |
+| Data Transfer | $0.50-1 | $2.50-5 |
+| ALB | $0.50 | $2.50 |
+| **Total** | **~$8-12/day** | **~$40-60/day** |
+
+### Cost Control Tips
+
+1. **Auto-Shutdown** - Enable in `config/teamX.cfg`:
    ```bash
-   aws acm list-certificates --region us-west-2
-   aws acm describe-certificate --certificate-arn <arn>
+   AUTO_SHUTDOWN_ENABLED=true
+   AUTO_SHUTDOWN_TIME=22:00  # 10 PM
+   AUTO_STARTUP_TIME=14:00   # 2 PM
    ```
 
-2. **Check ALB listener**:
+2. **Budget Alerts** - Set in AWS Budgets:
+   - Warning at $50/day
+   - Alert at $75/day
+   - Critical at $100/day
+
+3. **Regular Cleanup** - Schedule cleanup jobs:
    ```bash
-   aws elbv2 describe-listeners --load-balancer-arn <arn>
+   # Cron job to clean up idle resources
+   0 0 * * * /path/to/cleanup-idle-resources.sh
    ```
 
-3. **Flush DNS cache** (client side):
-   ```bash
-   # Mac
-   sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder
-   
-   # Windows
-   ipconfig /flushdns
-   ```
+---
 
-### Cluster Won't Form
+## Support Resources
 
-```bash
-# On VM1
-appdctl cluster init <VM2-IP> <VM3-IP>
+For instructor support:
 
-# If fails, check:
-# 1. Network connectivity
-ping <VM2-IP>
-
-# 2. Firewall
-appdctl show boot | grep firewall
-
-# 3. Time sync
-timedatectl
-
-# 4. Start over
-# Terminate VMs and redeploy
-```
+- **Lab Repository:** https://github.com/sandbreak80/dec25_lab
+- **Report Issues:** https://github.com/sandbreak80/dec25_lab/issues
+- **Official AppD Docs:** https://help.splunk.com/en/appdynamics-on-premises/
 
 ---
 
-## 📊 Monitoring (Instructor Dashboard)
+**Questions?** Open an issue in the lab repository or contact the lab maintainer.
 
-### Real-time Lab Status
-
-```bash
-# Watch all deployments
-watch -n 10 './scripts/check-status.sh config/team1.cfg; \
-              ./scripts/check-status.sh config/team2.cfg; \
-              ./scripts/check-status.sh config/team3.cfg; \
-              ./scripts/check-status.sh config/team4.cfg; \
-              ./scripts/check-status.sh config/team5.cfg'
-```
-
-### Team Progress Checklist
-
-| Team | VPC | VMs | ALB | DNS | Cluster | AppD | SecureApp |
-|------|-----|-----|-----|-----|---------|------|-----------|
-| 1    | ✅  | ✅  | ✅  | ✅  | ⏳      | ❌   | ❌        |
-| 2    | ✅  | ⏳  | ❌  | ❌  | ❌      | ❌   | ❌        |
-| ...  |     |     |     |     |         |      |           |
-
-Update manually or script it!
-
----
-
-## 📚 Additional Resources
-
-- [AWS Best Practices](docs/ARCHITECTURE.md)
-- [AppDynamics Documentation](https://docs.appdynamics.com/)
-- [Vendor Issues Fixed](docs/VENDOR_ISSUES.md)
-- [Security Configuration](docs/SECURITY.md)
-
----
-
-## 🆘 Emergency Contacts
-
-- **AWS Support**: https://console.aws.amazon.com/support/
-- **AppDynamics Support**: https://help.appdynamics.com/
-- **Your Company IT**: [Add contact info]
-
----
-
-## ✅ Post-Lab Checklist
-
-- [ ] All teams completed cleanup
-- [ ] No running EC2 instances
-- [ ] No allocated Elastic IPs
-- [ ] No Application Load Balancers
-- [ ] DNS records deleted (or marked for deletion)
-- [ ] IAM access keys rotated/deleted
-- [ ] S3 bucket cleaned (optional - reuse for next lab)
-- [ ] Cost report generated
-- [ ] Student feedback collected
-
----
-
-**Questions?** Review [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) or check vendor issues docs.
+**Last Updated:** December 17, 2025
