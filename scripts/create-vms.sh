@@ -75,7 +75,19 @@ for i in 1 2 3; do
     echo ""
     
     # Check if already exists
+    log_info "  Checking if VM already exists in AWS..."
     INSTANCE_ID=$(get_resource_id instance "$VM_NAME")
+    CHECK_RESULT=$?
+    
+    if [ $CHECK_RESULT -ne 0 ]; then
+        log_error "Failed to check if instance exists. See error above."
+        log_info "This could be due to:"
+        log_info "  - AWS CLI not configured correctly"
+        log_info "  - Invalid AWS credentials"
+        log_info "  - Network connectivity issues"
+        log_info "  - Wrong AWS region configured"
+        exit 1
+    fi
     
     if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
         

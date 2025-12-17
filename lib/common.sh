@@ -140,36 +140,63 @@ get_resource_id() {
     local resource_type=$1
     local resource_name=$2
     
+    # Don't fail the script if resource doesn't exist (that's OK)
+    # But DO show errors if AWS CLI command itself fails
+    local result
+    local exit_code
+    
     case $resource_type in
         vpc)
-            aws ec2 describe-vpcs --filters "Name=tag:Name,Values=$resource_name" --query 'Vpcs[0].VpcId' --output text 2>/dev/null
+            result=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=$resource_name" --query 'Vpcs[0].VpcId' --output text 2>&1)
+            exit_code=$?
             ;;
         subnet)
-            aws ec2 describe-subnets --filters "Name=tag:Name,Values=$resource_name" --query 'Subnets[0].SubnetId' --output text 2>/dev/null
+            result=$(aws ec2 describe-subnets --filters "Name=tag:Name,Values=$resource_name" --query 'Subnets[0].SubnetId' --output text 2>&1)
+            exit_code=$?
             ;;
         sg)
-            aws ec2 describe-security-groups --filters "Name=group-name,Values=$resource_name" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null
+            result=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=$resource_name" --query 'SecurityGroups[0].GroupId' --output text 2>&1)
+            exit_code=$?
             ;;
         igw)
-            aws ec2 describe-internet-gateways --filters "Name=tag:Name,Values=$resource_name" --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null
+            result=$(aws ec2 describe-internet-gateways --filters "Name=tag:Name,Values=$resource_name" --query 'InternetGateways[0].InternetGatewayId' --output text 2>&1)
+            exit_code=$?
             ;;
         rt)
-            aws ec2 describe-route-tables --filters "Name=tag:Name,Values=$resource_name" --query 'RouteTables[0].RouteTableId' --output text 2>/dev/null
+            result=$(aws ec2 describe-route-tables --filters "Name=tag:Name,Values=$resource_name" --query 'RouteTables[0].RouteTableId' --output text 2>&1)
+            exit_code=$?
             ;;
         instance)
-            aws ec2 describe-instances --filters "Name=tag:Name,Values=$resource_name" "Name=instance-state-name,Values=running,pending" --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null
+            result=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=$resource_name" "Name=instance-state-name,Values=running,pending" --query 'Reservations[0].Instances[0].InstanceId' --output text 2>&1)
+            exit_code=$?
             ;;
         alb)
-            aws elbv2 describe-load-balancers --names "$resource_name" --query 'LoadBalancers[0].LoadBalancerArn' --output text 2>/dev/null
+            result=$(aws elbv2 describe-load-balancers --names "$resource_name" --query 'LoadBalancers[0].LoadBalancerArn' --output text 2>&1)
+            exit_code=$?
             ;;
         tg)
-            aws elbv2 describe-target-groups --names "$resource_name" --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null
+            result=$(aws elbv2 describe-target-groups --names "$resource_name" --query 'TargetGroups[0].TargetGroupArn' --output text 2>&1)
+            exit_code=$?
             ;;
         *)
             log_error "Unknown resource type: $resource_type"
             return 1
             ;;
     esac
+    
+    # If AWS CLI command failed (not just "resource not found"), show the error
+    if [ $exit_code -ne 0 ]; then
+        # Check if it's a real error or just "resource not found" (which is OK)
+        if echo "$result" | grep -qE "(InvalidParameterValue|UnauthorizedOperation|AccessDenied|InvalidClientTokenId)"; then
+            log_error "AWS CLI error when checking for $resource_type '$resource_name':"
+            echo "$result" >&2
+            return 1
+        fi
+        # Otherwise, resource just doesn't exist (return empty, which is OK)
+    fi
+    
+    echo "$result"
+    return 0
 }
 
 # Save resource ID to file
