@@ -159,6 +159,44 @@
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "S3LabResourcesReadAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::appdynamics-lab-resources",
+        "arn:aws:s3:::appdynamics-lab-resources/*"
+      ]
+    },
+    {
+      "Sid": "EC2ModifySubnetAttribute",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:ModifySubnetAttribute"
+      ],
+      "Resource": "arn:aws:ec2:us-west-2:*:subnet/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-west-2"
+        }
+      }
+    },
+    {
+      "Sid": "ElasticLoadBalancingModifyTargetGroup",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:ModifyTargetGroup"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-west-2"
+        }
+      }
     }
   ]
 }
