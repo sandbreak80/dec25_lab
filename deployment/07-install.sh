@@ -84,6 +84,10 @@ VM1_PUB=$(cat "state/team${TEAM_NUMBER}/vm1-public-ip.txt")
 # Password is always AppDynamics123! (set in step 3)
 PASSWORD="AppDynamics123!"
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+# Export for expect scripts
+export VM1_PUB PASSWORD PROFILE
+
 log_info "Using password authentication (AppDynamics modifies keys during bootstrap)"
 
 # Check for expect
