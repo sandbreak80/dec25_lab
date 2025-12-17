@@ -74,3 +74,5 @@ globals.yaml.gotmpl.backup
 # Test outputs
 test-*.txt
 debug-*.txt
+AWS_PROFILE_SETUP.md
+SECURITY_SCAN_REPORT.md
