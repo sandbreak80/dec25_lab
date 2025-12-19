@@ -1,10 +1,25 @@
 # 🚀 START HERE - AppDynamics Lab Quick Start
 
-**Deploy your AppDynamics cluster in ~60 minutes**
+**Deploy your AppDynamics cluster in ~60 minutes with ONE COMMAND!**
 
 ---
 
-## ⚡ Quick Start (For Students)
+## 🎯 TL;DR - Quick Deploy
+
+**If you just want to get started:**
+
+1. Get AWS credentials from instructor
+2. Configure AWS CLI: `aws configure` (enter credentials)
+3. Clone repo: `git clone https://github.com/sandbreak80/dec25_lab.git && cd dec25_lab`
+4. Deploy: `./deployment/full-deploy.sh --team N` (replace N with your team number)
+5. Wait 60-70 minutes ☕
+6. Access Controller: `https://controller-teamN.splunkylabs.com/controller/`
+
+**That's it!** The full deployment is 100% automated.
+
+---
+
+## ⚡ Quick Start (Detailed Steps)
 
 ### Step 1: Get AWS Credentials
 
@@ -55,23 +70,48 @@ git clone https://github.com/sandbreak80/dec25_lab.git
 cd dec25_lab
 ```
 
-### Step 5: Deploy Your Lab
+### Step 5: Deploy Your Lab (ONE COMMAND!)
 
 ```bash
 # Replace N with your team number (1-5)
-./deployment/01-deploy.sh --team N
+./deployment/full-deploy.sh --team N
 ```
 
-**This will automatically:**
-- ✅ Create your VPC and networking
-- ✅ Launch 3 EC2 instances
-- ✅ Configure load balancer and SSL
-- ✅ Set up DNS records
-- ✅ Bootstrap all VMs
-- ✅ Create Kubernetes cluster
-- ✅ Install AppDynamics (Controller, EUM, Events, AIOps, SecureApp)
+**This ONE command automatically runs all steps:**
+- ✅ Checks prerequisites
+- ✅ Creates VPC and networking
+- ✅ Launches 3 EC2 instances
+- ✅ Changes default password
+- ✅ Sets up SSH keys (passwordless)
+- ✅ Bootstraps all VMs
+- ✅ Creates Kubernetes cluster
+- ✅ Configures AppDynamics
+- ✅ Installs all services (Controller, EUM, Events, AIOps, SecureApp)
+- ✅ Applies license
+- ✅ Verifies deployment
 
-**Total time:** ~60 minutes
+**Total time:** ~60-70 minutes (fully automated, no interaction needed!)
+
+**What you'll see:**
+```
+╔══════════════════════════════════════════════════════════╗
+║   🚀 Full Non-Interactive AppDynamics Deployment 🚀      ║
+╚══════════════════════════════════════════════════════════╝
+
+[1/11] Prerequisites Check
+[2/11] Deploy Infrastructure (10 min)
+[3/11] Change VM Password (1 min)
+[4/11] Setup SSH Keys (1 min)
+[5/11] Bootstrap VMs (20 min)
+[6/11] Create Kubernetes Cluster (10 min)
+[7/11] Configure AppDynamics (1 min)
+[8/11] Install AppDynamics Services (30 min)
+[9/11] Apply License (1 min)
+[10/11] Configure SecureApp (optional)
+[11/11] Verify Deployment (1 min)
+```
+
+**Just run it and wait!** The script shows real-time progress.
 
 ---
 
@@ -319,9 +359,21 @@ After completing this lab, you will understand:
 
 ## ⚡ Advanced Options
 
-### Manual Step-by-Step Deployment
+### Option 1: One-Command Deployment (RECOMMENDED) ⭐
 
-If you prefer to run each phase separately:
+**The easy way - just one command!**
+
+```bash
+./deployment/full-deploy.sh --team N
+```
+
+This automatically runs ALL steps (1-11) with no interaction required!  
+**Time:** 60-70 minutes  
+**User interaction:** ZERO!
+
+### Option 2: Manual Step-by-Step Deployment
+
+If you prefer to run each phase separately or need to troubleshoot:
 
 ```bash
 # Phase 1: Infrastructure (10 min)
@@ -351,6 +403,11 @@ If you prefer to run each phase separately:
 # Phase 9: Apply license (1 min)
 ./deployment/09-apply-license.sh --team N
 ```
+
+**Use this if:**
+- You want to understand each step
+- You need to troubleshoot a specific phase
+- You're testing script modifications
 
 ### SSH to Your VMs
 
@@ -407,9 +464,16 @@ kubectl get pods -A
 
 **Ready? Let's go!** 🚀
 
+**ONE COMMAND DEPLOYMENT:**
 ```bash
-./deployment/01-deploy.sh --team <YOUR-TEAM-NUMBER>
+./deployment/full-deploy.sh --team <YOUR-TEAM-NUMBER>
 ```
+
+Sit back, relax, and watch the magic happen! ☕
+
+---
+
+**Want to run steps manually?** Check the "Advanced Options" section above.
 
 **Questions during deployment?**
 - Check QUICK_REFERENCE.md
@@ -420,4 +484,5 @@ kubectl get pods -A
 
 **Last Updated:** December 19, 2025  
 **Version:** 2.0  
-**Status:** ✅ All critical defects fixed
+**Status:** ✅ All critical defects fixed  
+**Deployment:** ONE COMMAND! 🚀
