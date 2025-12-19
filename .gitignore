@@ -8,7 +8,6 @@ aws-credentials.txt
 secrets.yaml
 lab-student-credentials.json
 STUDENT_CREDENTIALS.txt
-START_HERE.md
 *accessKeys*.csv
 *_accessKeys*.csv
 credentials*.csv
