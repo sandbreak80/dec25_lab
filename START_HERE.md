@@ -1,25 +1,26 @@
 # 🚀 START HERE - AppDynamics Lab Quick Start
 
-**Deploy your AppDynamics cluster in ~60 minutes with ONE COMMAND!**
+**Deploy your AppDynamics cluster step-by-step in ~60 minutes**
+
+**Learning Goal:** Understand each phase of deployment and practice troubleshooting.
 
 ---
 
-## 🎯 TL;DR - Quick Deploy
+## 🎯 Lab Objectives
 
-**If you just want to get started:**
+In this lab, you will:
+- ✅ Deploy AWS infrastructure (VPC, EC2, Load Balancer, DNS)
+- ✅ Bootstrap AppDynamics Virtual Appliances  
+- ✅ Create a Kubernetes cluster
+- ✅ Install and configure AppDynamics platform
+- ✅ Troubleshoot issues as they arise
+- ✅ Verify deployment success
 
-1. Get AWS credentials from instructor
-2. Configure AWS CLI: `aws configure` (enter credentials)
-3. Clone repo: `git clone https://github.com/sandbreak80/dec25_lab.git && cd dec25_lab`
-4. Deploy: `./deployment/full-deploy.sh --team N` (replace N with your team number)
-5. Wait 60-70 minutes ☕
-6. Access Controller: `https://controller-teamN.splunkylabs.com/controller/`
-
-**That's it!** The full deployment is 100% automated.
+**Learning approach:** You'll run each deployment phase separately to understand the process and practice troubleshooting.
 
 ---
 
-## ⚡ Quick Start (Detailed Steps)
+## ⚡ Quick Start (Step-by-Step)
 
 ### Step 1: Get AWS Credentials
 
@@ -70,54 +71,159 @@ git clone https://github.com/sandbreak80/dec25_lab.git
 cd dec25_lab
 ```
 
-### Step 5: Deploy Your Lab (ONE COMMAND!)
+### Step 5: Deploy Your Lab (9 Steps)
+
+Now you'll run 9 deployment scripts, one at a time. This helps you understand each phase and practice troubleshooting.
+
+---
+
+#### Phase 1: Infrastructure (10 minutes)
 
 ```bash
-# Replace N with your team number (1-5)
-./deployment/full-deploy.sh --team N
+./deployment/01-deploy.sh --team N
 ```
 
-**This ONE command automatically runs all steps:**
-- ✅ Checks prerequisites
-- ✅ Creates VPC and networking
-- ✅ Launches 3 EC2 instances
-- ✅ Changes default password
-- ✅ Sets up SSH keys (passwordless)
-- ✅ Bootstraps all VMs
-- ✅ Creates Kubernetes cluster
-- ✅ Configures AppDynamics
-- ✅ Installs all services (Controller, EUM, Events, AIOps, SecureApp)
-- ✅ Applies license
-- ✅ Verifies deployment
+**What this does:**
+- Creates VPC, subnets, internet gateway
+- Launches 3 EC2 instances (m5a.4xlarge: 16 vCPU, 64GB RAM each)
+- Creates Application Load Balancer with SSL
+- Sets up DNS records (`controller-teamN.splunkylabs.com`)
+- Configures security groups
 
-**Total time:** ~60-70 minutes (fully automated, no interaction needed!)
+**Wait for:** "✅ DEPLOYMENT COMPLETE!"
 
-**What you'll see:**
-```
-╔══════════════════════════════════════════════════════════╗
-║   🚀 Full Non-Interactive AppDynamics Deployment 🚀      ║
-╚══════════════════════════════════════════════════════════╝
+---
 
-[1/11] Prerequisites Check
-[2/11] Deploy Infrastructure (10 min)
-[3/11] Change VM Password (1 min)
-[4/11] Setup SSH Keys (1 min)
-[5/11] Bootstrap VMs (20 min)
-[6/11] Create Kubernetes Cluster (10 min)
-[7/11] Configure AppDynamics (1 min)
-[8/11] Install AppDynamics Services (30 min)
-[9/11] Apply License (1 min)
-[10/11] Configure SecureApp (optional)
-[11/11] Verify Deployment (1 min)
+#### Phase 2: Change Password (1 minute)
+
+```bash
+./deployment/02-change-password.sh --team N
 ```
 
-**Just run it and wait!** The script shows real-time progress.
+**What this does:**
+- Changes default password from `changeme` to `AppDynamics123!`
+
+**Why:** The Virtual Appliance requires password change on first login.
+
+---
+
+#### Phase 3: Setup SSH Keys (1 minute)
+
+```bash
+./deployment/03-setup-ssh-keys.sh --team N
+```
+
+**What this does:**
+- Generates SSH key pair
+- Installs public key on all 3 VMs
+- Enables passwordless access
+
+**Why:** Makes subsequent steps easier (no password prompts).
+
+---
+
+#### Phase 4: Bootstrap VMs (20 minutes)
+
+```bash
+./deployment/04-bootstrap-vms.sh --team N
+```
+
+**What this does:**
+- Runs `appdctl host init` on each VM
+- Configures storage (LVM for data disk)
+- Installs MicroK8s
+- Extracts container images (this takes 15-20 min)
+- Configures networking and firewall
+- Sets up passwordless sudo (fixes DEFECT-004)
+
+**Wait for:** "✅ BOOTSTRAP COMPLETE on all VMs!"
+
+**Script shows progress:** Updates every 60 seconds with elapsed time.
+
+**Learning moment:** If bootstrap takes longer than expected, SSH to a VM and run `appdctl show boot` to see detailed status.
+
+---
+
+#### Phase 5: Create Cluster (10 minutes)
+
+```bash
+./deployment/05-create-cluster.sh --team N
+```
+
+**What this does:**
+- Verifies bootstrap completed successfully
+- Runs `appdctl cluster init <VM2_IP> <VM3_IP>` on VM1
+- Creates 3-node high-availability Kubernetes cluster
+
+**Wait for:** "✅ CLUSTER INITIALIZATION COMPLETE!"
+
+**Learning moment:** After completion, run `appdctl show cluster` on VM1 to see all 3 nodes.
+
+---
+
+#### Phase 6: Configure AppDynamics (1 minute)
+
+```bash
+./deployment/06-configure.sh --team N
+```
+
+**What this does:**
+- Updates `globals.yaml.gotmpl` with your team's DNS names
+- Sets Controller URL, Events Service URL, etc.
+
+---
+
+#### Phase 7: Install Services (30 minutes)
+
+```bash
+./deployment/07-install.sh --team N
+```
+
+**What this does:**
+- Runs `appdcli start all small`
+- Waits for MySQL InnoDB cluster to be ready (fixes DEFECT-003)
+- Installs Controller, EUM, Events Service, AIOps, ATD, SecureApp
+
+**Script shows progress:** Updates every 60 seconds with elapsed time.
+
+**Wait for:** "✅ INSTALLATION COMPLETE!"
+
+**Learning moment:** During the wait, SSH to VM1 and watch pods being created with `kubectl get pods -A -w`
+
+---
+
+#### Phase 8: Verify Deployment (1 minute)
+
+```bash
+./deployment/08-verify.sh --team N
+```
+
+**What this does:**
+- Checks all services are running
+- Verifies cluster health
+- Shows Controller URL
+
+**Look for:** All services showing "Success"
+
+---
+
+#### Phase 9: Apply License (1 minute)
+
+```bash
+./deployment/09-apply-license.sh --team N
+```
+
+**What this does:**
+- Uploads license from S3 to Controller
+- Applies license
+
+**Total time:** ~60-70 minutes for all 9 phases
 
 ---
 
 ## 📊 What You'll Get
 
-After deployment completes:
+After all 9 phases complete:
 
 ### Your Controller
 - **URL:** `https://controller-teamN.splunkylabs.com/controller/`
@@ -130,6 +236,7 @@ After deployment completes:
 - Load balancer with SSL certificate
 - DNS: `teamN.splunkylabs.com`
 - Isolated VPC with security groups
+- 3-node Kubernetes cluster
 
 ---
 
@@ -147,7 +254,7 @@ aws configure
 
 ### ❌ Script exits silently with no error
 
-**Problem:** Wrong AWS profile or permission issue
+**Problem:** Wrong AWS profile or permission issue (DEFECT-001 - FIXED)
 
 **Fix:**
 ```bash
@@ -164,11 +271,11 @@ unset AWS_PROFILE
 
 ### ❌ "An error occurred (UnauthorizedOperation)"
 
-**Problem:** IAM permissions insufficient
+**Problem:** IAM permissions insufficient (DEFECT-002 - FIXED)
 
 **Fix:**
 1. Verify your credentials are correct
-2. Contact instructor (you may need updated IAM policy)
+2. Contact instructor (they may need to update your IAM policy)
 3. Test permissions:
 ```bash
 ./scripts/test-aws-cli.sh
@@ -185,10 +292,10 @@ unset AWS_PROFILE
 
 ### ❌ "MySQL database is locked" error
 
-**Problem:** Race condition during installation (FIXED)
+**Problem:** Race condition during installation (DEFECT-003 - FIXED)
 
 **Fix:**
-✅ This is now automatically handled! The script waits for MySQL to be ready.
+✅ This is now automatically handled! The script waits for MySQL to be ready before proceeding.
 
 If you still see this error, wait 2 minutes and it should resolve.
 
@@ -216,21 +323,29 @@ appdcli start <service-name>
 
 ## 📋 Deployment Checklist
 
-Use this to track your progress:
+Use this to track your progress through all 9 phases:
 
-- [ ] AWS credentials configured
-- [ ] Authentication verified (`aws sts get-caller-identity`)
-- [ ] Repository cloned
-- [ ] VPN connected (if required)
-- [ ] Started deployment: `./deployment/01-deploy.sh --team N`
-- [ ] Infrastructure created (~10 min)
-- [ ] VMs bootstrapped (~20 min)
-- [ ] Cluster created (~10 min)
-- [ ] AppDynamics installed (~30 min)
-- [ ] Controller accessible at `https://controller-teamN.splunkylabs.com/controller/`
-- [ ] Logged in successfully
-- [ ] Password changed
-- [ ] License applied (if instructor provided)
+- [ ] **Prerequisites**
+  - [ ] AWS credentials configured
+  - [ ] Authentication verified (`aws sts get-caller-identity`)
+  - [ ] Repository cloned
+  - [ ] VPN connected (if required)
+
+- [ ] **Phase 1:** Infrastructure deployed (`01-deploy.sh`)
+- [ ] **Phase 2:** Password changed (`02-change-password.sh`)
+- [ ] **Phase 3:** SSH keys setup (`03-setup-ssh-keys.sh`)
+- [ ] **Phase 4:** VMs bootstrapped (`04-bootstrap-vms.sh`)
+- [ ] **Phase 5:** Cluster created (`05-create-cluster.sh`)
+- [ ] **Phase 6:** AppD configured (`06-configure.sh`)
+- [ ] **Phase 7:** Services installed (`07-install.sh`)
+- [ ] **Phase 8:** Deployment verified (`08-verify.sh`)
+- [ ] **Phase 9:** License applied (`09-apply-license.sh`)
+
+- [ ] **Verification**
+  - [ ] Controller accessible at URL
+  - [ ] Logged in successfully
+  - [ ] Password changed
+  - [ ] All services show "Success"
 
 ---
 
@@ -239,7 +354,7 @@ Use this to track your progress:
 ### Check All Services Are Running
 
 ```bash
-# From your laptop
+# SSH to VM1
 ssh appduser@<VM1-IP>
 
 # On VM1
@@ -303,13 +418,14 @@ This removes:
 - Include your team number
 - Include error messages (screenshots help!)
 - Include output of `aws sts get-caller-identity`
+- Mention which phase failed (1-9)
 
 ---
 
 ## 📚 Documentation
 
 ### For Students
-- **START_HERE.md** (this file) - Quick start
+- **START_HERE.md** (this file) - Quick start guide
 - **QUICK_REFERENCE.md** - Common commands
 - **common_issues.md** - FAQ and troubleshooting
 - **docs/LAB_GUIDE.md** - Detailed step-by-step guide
@@ -326,24 +442,24 @@ This removes:
 
 Your lab is successful when:
 
-1. ✅ Controller UI loads at `https://controller-teamN.splunkylabs.com/controller/`
-2. ✅ You can log in with `admin/welcome`
-3. ✅ All services show "Success" in `appdcli ping`
-4. ✅ Dashboard shows "Platform Services: OK"
-5. ✅ You can create an application and see data flowing
+1. ✅ All 9 deployment phases completed without errors
+2. ✅ Controller UI loads at `https://controller-teamN.splunkylabs.com/controller/`
+3. ✅ You can log in with `admin/welcome`
+4. ✅ All services show "Success" in `appdcli ping`
+5. ✅ Dashboard shows "Platform Services: OK"
 
 ---
 
 ## 🎯 Learning Objectives
 
-After completing this lab, you will understand:
+By completing this 9-step deployment, you will learn:
 
-- ✅ AppDynamics architecture and components
-- ✅ Kubernetes cluster deployment
-- ✅ AWS infrastructure automation
-- ✅ Load balancing and SSL certificates
-- ✅ Application monitoring setup
+- ✅ AWS infrastructure components (VPC, EC2, ALB, Route53)
+- ✅ Kubernetes cluster architecture and setup
+- ✅ AppDynamics platform components and their roles
 - ✅ Troubleshooting distributed systems
+- ✅ Service health monitoring and verification
+- ✅ Common deployment issues and their fixes
 
 ---
 
@@ -357,132 +473,79 @@ After completing this lab, you will understand:
 
 ---
 
-## ⚡ Advanced Options
+## ⚡ Alternative: Automated Deployment (For Instructors Only)
 
-### Option 1: One-Command Deployment (RECOMMENDED) ⭐
+**Note:** This is for instructor testing only. Students should use the 9-step process above for learning.
 
-**The easy way - just one command!**
+If you need to deploy quickly without the learning experience:
 
 ```bash
 ./deployment/full-deploy.sh --team N
 ```
 
-This automatically runs ALL steps (1-11) with no interaction required!  
-**Time:** 60-70 minutes  
-**User interaction:** ZERO!
+This runs all 9 phases automatically with no interaction required (60-70 minutes).
 
-### Option 2: Manual Step-by-Step Deployment
-
-If you prefer to run each phase separately or need to troubleshoot:
-
-```bash
-# Phase 1: Infrastructure (10 min)
-./deployment/01-deploy.sh --team N
-
-# Phase 2: Change password (1 min)
-./deployment/02-change-password.sh --team N
-
-# Phase 3: Setup SSH keys - Optional (1 min)
-./deployment/03-setup-ssh-keys.sh --team N
-
-# Phase 4: Bootstrap VMs (20 min)
-./deployment/04-bootstrap-vms.sh --team N
-
-# Phase 5: Create cluster (10 min)
-./deployment/05-create-cluster.sh --team N
-
-# Phase 6: Configure AppD (1 min)
-./deployment/06-configure.sh --team N
-
-# Phase 7: Install services (30 min)
-./deployment/07-install.sh --team N
-
-# Phase 8: Verify (1 min)
-./deployment/08-verify.sh --team N
-
-# Phase 9: Apply license (1 min)
-./deployment/09-apply-license.sh --team N
-```
-
-**Use this if:**
-- You want to understand each step
-- You need to troubleshoot a specific phase
-- You're testing script modifications
-
-### SSH to Your VMs
-
-```bash
-# Quick SSH scripts
-./scripts/ssh-vm1.sh --team N
-./scripts/ssh-vm2.sh --team N
-./scripts/ssh-vm3.sh --team N
-
-# Manual SSH
-ssh appduser@<VM-PUBLIC-IP>
-# Password: AppDynamics123!
-```
+**Why students shouldn't use this:**
+- You miss learning what each phase does
+- You can't practice troubleshooting between steps
+- You don't see intermediate outputs
+- It's harder to debug if something fails
 
 ---
 
-## 📈 Monitoring Progress
+## 📈 Monitoring Your Progress
 
-### During Deployment
+### Between Phases
 
-The script shows real-time progress:
-```
-[INFO] Phase 1/9: Infrastructure deployment
-[INFO] Phase 2/9: Changing passwords
-[INFO] Phase 3/9: Bootstrapping VMs (this takes 20 minutes)
-[INFO] Elapsed time: 5 minutes... VMs still bootstrapping
-[INFO] Phase 4/9: Creating cluster
-[INFO] Phase 5/9: Configuring AppDynamics
-[INFO] Phase 6/9: Installing services (this takes 30 minutes)
-[INFO] Elapsed time: 10 minutes... services still installing
-```
-
-### Manual Progress Check
+After each phase completes, you can check status:
 
 ```bash
 # SSH to VM1
 ssh appduser@<VM1-IP>
 
-# Check bootstrap status
+# Check bootstrap status (after Phase 4)
 appdctl show boot
 
-# Check cluster status
+# Check cluster status (after Phase 5)
 appdctl show cluster
 
-# Check service status
+# Check service status (after Phase 7)
 appdcli ping
 appdcli status
 
-# Check pod status
+# Check pod status (after Phase 7)
 kubectl get pods -A
 ```
 
 ---
 
-**Ready? Let's go!** 🚀
+**Ready? Let's start!** 🚀
 
-**ONE COMMAND DEPLOYMENT:**
+**Begin with Phase 1:**
 ```bash
-./deployment/full-deploy.sh --team <YOUR-TEAM-NUMBER>
+./deployment/01-deploy.sh --team <YOUR-TEAM-NUMBER>
 ```
 
-Sit back, relax, and watch the magic happen! ☕
+Then proceed through phases 2-9 as shown above.
+
+**Between phases:**
+- Read what each script does
+- Observe the output
+- If you hit an error, check the troubleshooting sections
+- Ask questions!
+- Don't rush - understanding is more important than speed
 
 ---
 
-**Want to run steps manually?** Check the "Advanced Options" section above.
-
 **Questions during deployment?**
-- Check QUICK_REFERENCE.md
-- Check common_issues.md
+- Check QUICK_REFERENCE.md for commands
+- Check common_issues.md for known issues
+- Review the troubleshooting section above
 - Ask your instructor
 
 ---
 
 **Last Updated:** December 19, 2025  
-**Version:** 2.0  
+**Version:** 2.0 - Step-by-Step Edition  
 **Status:** ✅ All critical defects fixed  
-**Deployment:** ONE COMMAND! 🚀
+**Approach:** 9 steps for hands-on learning 📚
