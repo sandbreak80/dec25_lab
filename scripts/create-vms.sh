@@ -51,13 +51,20 @@ fi
 
 log_success "All prerequisite resources found!"
 
-# Get AMI ID (shared across all teams)
-log_info "Loading AMI ID..."
-AMI_ID=$(cat "state/shared/ami.id" 2>/dev/null)
+# Get AMI ID (from global config)
+log_info "Loading AMI ID from global configuration..."
+if [ -f "${SCRIPT_DIR}/config/global.cfg" ]; then
+    source "${SCRIPT_DIR}/config/global.cfg"
+    AMI_ID="$APPD_AMI_ID"
+else
+    log_error "Global configuration not found: config/global.cfg"
+    exit 1
+fi
+
 if [ -z "$AMI_ID" ] || [ "$AMI_ID" == "None" ]; then
-    log_error "AMI not found. Contact instructor."
-    log_info "Expected state file: state/shared/ami.id"
-    log_info "The instructor must provide the AppDynamics Virtual Appliance AMI ID."
+    log_error "AMI ID not configured in config/global.cfg"
+    log_info "Update APPD_AMI_ID in config/global.cfg"
+    log_info "Contact instructor if you don't have this value."
     exit 1
 fi
 

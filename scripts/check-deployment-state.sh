@@ -127,7 +127,15 @@ echo ""
 echo "📦 Shared Resources"
 echo "───────────────────────────────────"
 
-AMI_ID=$(cat "state/shared/ami.id" 2>/dev/null)
+# AMI Configuration (from global config)
+if [ -f "config/global.cfg" ]; then
+    source "config/global.cfg"
+    AMI_ID="$APPD_AMI_ID"
+    AMI_STATUS="configured"
+else
+    AMI_ID="NOT_FOUND"
+    AMI_STATUS="missing config/global.cfg"
+fi
 if [ -z "$AMI_ID" ] || [ "$AMI_ID" == "None" ]; then
     log_error "AMI ID not found"
     echo "  State file: state/shared/ami.id"
@@ -190,4 +198,7 @@ else
 fi
 
 echo ""
+
+
+
 

@@ -81,3 +81,6 @@ tail -f logs/full-deploy/team5-*.log
 
 **Remember:** This is a testing tool, not part of the lab curriculum!
 
+
+
+

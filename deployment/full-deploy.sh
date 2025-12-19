@@ -222,10 +222,31 @@ run_step 9 "Apply AppDynamics License" \
     "${SCRIPT_DIR}/09-apply-license.sh" --team "$TEAM_NUMBER"
 
 # =============================================================================
-# STEP 10: Verify Deployment (1 minute)
+# STEP 10: Configure SecureApp Feeds (2-3 minutes + 5-10 min download)
+# =============================================================================
+# Note: Requires APPD_PORTAL_USERNAME and APPD_PORTAL_PASSWORD environment variables
+if [ -n "$APPD_PORTAL_USERNAME" ] && [ -n "$APPD_PORTAL_PASSWORD" ]; then
+    log_info "Portal credentials found in environment variables"
+    run_step 10 "Configure SecureApp Vulnerability Feeds" \
+        "${SCRIPT_DIR}/10-configure-secureapp.sh" \
+        --team "$TEAM_NUMBER" \
+        --username "$APPD_PORTAL_USERNAME" \
+        --password "$APPD_PORTAL_PASSWORD" || {
+        log_warning "SecureApp feed configuration failed, but deployment can continue"
+        log_warning "SecureApp will work for runtime security without vulnerability feeds"
+        log_warning "Run manually later: ./deployment/10-configure-secureapp.sh --team $TEAM_NUMBER"
+    }
+else
+    log_warning "Skipping SecureApp feed configuration - no portal credentials provided"
+    log_warning "Set APPD_PORTAL_USERNAME and APPD_PORTAL_PASSWORD to enable automatic feeds"
+    log_warning "Or run manually later: ./deployment/10-configure-secureapp.sh --team $TEAM_NUMBER"
+fi
+
+# =============================================================================
+# STEP 11: Verify Deployment (1 minute)
 # =============================================================================
 if [ "$SKIP_VERIFY" = false ]; then
-    run_step 10 "Verify Deployment" \
+    run_step 11 "Verify Deployment" \
         "${SCRIPT_DIR}/08-verify.sh" --team "$TEAM_NUMBER" || {
         log_warning "Verification had issues, but deployment may still be functional"
     }
