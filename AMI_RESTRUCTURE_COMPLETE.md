@@ -240,3 +240,4 @@ Date: December 18, 2025
 Issue: AMI ID stored in state directory
 Resolution: Moved to config/global.cfg with proper separation
 
+

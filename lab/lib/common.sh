@@ -79,9 +79,6 @@ load_team_config() {
     log_info "Loading configuration for Team ${team_num}..."
     source "$config_file"
     
-    # Set AWS profile
-    export AWS_PROFILE="${AWS_PROFILE}"
-    
     log_success "Configuration loaded: Team ${team_num}"
     log_info "VPC: ${VPC_NAME} (${VPC_CIDR})"
     log_info "Domain: ${FULL_DOMAIN}"
@@ -97,7 +94,7 @@ check_aws_cli() {
     
     if ! aws sts get-caller-identity &> /dev/null; then
         log_error "AWS CLI is not configured or credentials are invalid"
-        log_info "Run: aws configure --profile ${AWS_PROFILE}"
+        log_info "Run: aws configure"
         exit 1
     fi
     
@@ -294,7 +291,6 @@ show_header() {
     echo ""
     echo "Team: ${team_num}"
     echo "Region: ${AWS_REGION}"
-    echo "Profile: ${AWS_PROFILE}"
     echo ""
 }
 

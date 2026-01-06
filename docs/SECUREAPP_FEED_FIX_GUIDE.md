@@ -214,3 +214,4 @@ kubectl exec -it vuln-658f4f5f69-b7p88 -n cisco-secureapp -- env | grep OPFDL
 **Impact**: Low - Most SecureApp features work without feeds. Vulnerability scanning is a nice-to-have feature that can be added later.
 
 
+

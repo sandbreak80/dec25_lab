@@ -154,12 +154,27 @@ if [ -n "$INSTANCE_IDS" ]; then
         fi
     done
     
-    # Get volume IDs before terminating (data volumes have DeleteOnTermination=false)
-    log_info "Identifying data volumes to delete..."
+    # Get ALL volume IDs attached to these instances (not just /dev/sdb)
+    # This ensures we capture volumes even if attachment info is inconsistent
+    log_info "Identifying all volumes attached to instances..."
     VOLUME_IDS=$(aws ec2 describe-volumes \
-        --filters "Name=attachment.instance-id,Values=$INSTANCE_IDS" "Name=attachment.device,Values=/dev/sdb" \
+        --filters "Name=attachment.instance-id,Values=$INSTANCE_IDS" \
+        --query 'Volumes[?Attachments[0].DeleteOnTermination==`false`].VolumeId' \
+        --output text 2>/dev/null)
+    
+    # Also check for any 500GB volumes attached to these instances (fallback)
+    VOLUME_IDS_500GB=$(aws ec2 describe-volumes \
+        --filters "Name=attachment.instance-id,Values=$INSTANCE_IDS" "Name=size,Values=500" \
         --query 'Volumes[*].VolumeId' \
         --output text 2>/dev/null)
+    
+    # Combine and deduplicate
+    ALL_VOLUME_IDS=$(echo "$VOLUME_IDS $VOLUME_IDS_500GB" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    
+    if [ -n "$ALL_VOLUME_IDS" ]; then
+        VOLUME_COUNT=$(echo "$ALL_VOLUME_IDS" | wc -w | tr -d ' ')
+        log_info "Found ${VOLUME_COUNT} data volume(s) to clean up after termination"
+    fi
     
     aws ec2 terminate-instances --instance-ids $INSTANCE_IDS >/dev/null 2>&1 || true
     log_info "Waiting for instances to terminate..."
@@ -167,12 +182,14 @@ if [ -n "$INSTANCE_IDS" ]; then
     log_success "Instances and Elastic IPs deleted"
     
     # Delete data volumes (they don't auto-delete)
-    if [ -n "$VOLUME_IDS" ]; then
-        log_info "Deleting orphaned data volumes..."
-        for vol_id in $VOLUME_IDS; do
+    if [ -n "$ALL_VOLUME_IDS" ]; then
+        log_info "Deleting data volumes..."
+        for vol_id in $ALL_VOLUME_IDS; do
             if [ -n "$vol_id" ] && [ "$vol_id" != "None" ]; then
                 log_info "  Deleting volume: $vol_id"
-                aws ec2 delete-volume --volume-id "$vol_id" 2>/dev/null || true
+                # Wait a bit for volume to be available
+                sleep 2
+                aws ec2 delete-volume --volume-id "$vol_id" 2>/dev/null || log_warning "    Failed to delete $vol_id (may retry later)"
             fi
         done
         log_success "Data volumes deleted"
@@ -322,22 +339,37 @@ fi
 # Phase 9: Orphan Check and Final Cleanup
 log_info "[9/10] Checking for orphaned resources..."
 
-# Check for orphaned volumes
-ORPHAN_VOLUMES=$(aws ec2 describe-volumes \
+# Check for orphaned volumes (both tagged and untagged)
+# First check for tagged volumes
+ORPHAN_VOLUMES_TAGGED=$(aws ec2 describe-volumes \
     --filters "Name=tag:Team,Values=team${TEAM_NUMBER}" "Name=status,Values=available" \
-    --query 'Volumes[*].[VolumeId,Size,State]' \
+    --query 'Volumes[*].VolumeId' \
     --output text 2>/dev/null)
 
+# Also check for 500GB volumes that might have been created without tags
+ORPHAN_VOLUMES_500GB=$(aws ec2 describe-volumes \
+    --filters "Name=size,Values=500" "Name=status,Values=available" \
+    --query 'Volumes[*].VolumeId' \
+    --output text 2>/dev/null)
+
+# Combine both lists and remove duplicates
+ORPHAN_VOLUMES=$(echo "$ORPHAN_VOLUMES_TAGGED $ORPHAN_VOLUMES_500GB" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+
 if [ -n "$ORPHAN_VOLUMES" ]; then
-    log_warning "Found orphaned volumes:"
-    echo "$ORPHAN_VOLUMES"
+    VOLUME_COUNT=$(echo "$ORPHAN_VOLUMES" | wc -w | tr -d ' ')
+    log_warning "Found ${VOLUME_COUNT} orphaned volume(s)"
     log_info "Deleting orphaned volumes..."
-    echo "$ORPHAN_VOLUMES" | awk '{print $1}' | while read vol_id; do
+    for vol_id in $ORPHAN_VOLUMES; do
         if [ -n "$vol_id" ]; then
-            log_info "  Deleting volume: $vol_id"
-            aws ec2 delete-volume --volume-id "$vol_id" 2>/dev/null || true
+            # Get volume details for logging
+            VOL_INFO=$(aws ec2 describe-volumes --volume-ids "$vol_id" \
+                --query 'Volumes[0].[Size,State]' --output text 2>/dev/null || echo "unknown unknown")
+            VOL_SIZE=$(echo "$VOL_INFO" | awk '{print $1}')
+            log_info "  Deleting volume: $vol_id (${VOL_SIZE}GB)"
+            aws ec2 delete-volume --volume-id "$vol_id" 2>/dev/null || log_warning "    Failed to delete $vol_id"
         fi
     done
+    log_success "Volume cleanup complete"
 fi
 
 # Check for orphaned EIPs

@@ -18,10 +18,13 @@ license.lic
 
 # Deployment State
 state/
-!state/shared/
-!state/shared/ami.id
+!state/shared/.gitkeep
 logs/
 *.log
+
+# SecureApp feed data
+secapp_data_*.dat
+feed_key.yaml
 
 # Temporary Files
 *.bak

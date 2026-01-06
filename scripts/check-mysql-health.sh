@@ -242,3 +242,4 @@ echo "  appd-mysql-router pods (3x) Running"
 echo ""
 exit 1
 
+

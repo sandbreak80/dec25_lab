@@ -28,7 +28,6 @@ VPCS=(
     "vpc-09eae48c62d7ad537:Team-2-Orphaned"
 )
 
-AWS_PROFILE="${AWS_PROFILE:-default}"
 AWS_REGION="${AWS_REGION:-us-west-2}"
 
 echo ""
@@ -57,7 +56,7 @@ if [ "$confirmation" != "DELETE ALL" ]; then
 fi
 
 echo ""
-log_info "Starting cleanup with profile: $AWS_PROFILE"
+log_info "Starting cleanup using default AWS profile"
 
 cleanup_vpc() {
     local vpc_id=$1
@@ -323,6 +322,7 @@ All orphaned VPCs and their resources have been processed.
 EOF
 
 log_info "Cleanup completed at $(date)"
+
 
 
 
